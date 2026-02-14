@@ -1,7 +1,8 @@
-// Extended types for our tables - derived from Supabase schema
+// Extended types for our tables
 export interface Client {
   id: string;
   user_id: string;
+  tenant_id: string | null;
   name: string;
   phone: string | null;
   plan: string;
@@ -10,6 +11,56 @@ export interface Client {
   is_suspended: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  status: string;
+  max_resellers: number;
+  max_clients: number;
+  max_messages_month: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: string;
+  tenant_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: Record<string, any>;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface GlobalSetting {
+  id: string;
+  key: string;
+  value: Record<string, any>;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface ImpersonateSession {
+  id: string;
+  super_admin_id: string;
+  target_user_id: string;
+  target_tenant_id: string | null;
+  started_at: string;
+  ended_at: string | null;
+  is_active: boolean;
 }
 
 export interface MessageTemplate {

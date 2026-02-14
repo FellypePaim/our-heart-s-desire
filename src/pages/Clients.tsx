@@ -26,11 +26,11 @@ const Clients = () => {
   }, [clients, search]);
 
   return (
-    <div className="flex-1 overflow-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Users className="h-6 w-6" />
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-5 w-5 md:h-6 md:w-6" />
             Clientes
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -50,7 +50,7 @@ const Clients = () => {
         />
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

@@ -37,11 +37,11 @@ const Index = () => {
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Header */}
-      <header className="border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="border-b px-4 md:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Radar className="h-6 w-6 text-status-today" />
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Radar className="h-5 w-5 md:h-6 md:w-6 text-status-today" />
               Radar Operacional
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -52,7 +52,7 @@ const Index = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           {[
             { label: "Total", value: stats.total, icon: Users, color: "text-foreground" },
             { label: "Ativos", value: stats.active, icon: CheckCircle, color: "text-status-active" },
@@ -62,7 +62,7 @@ const Index = () => {
             <div key={s.label} className="flex items-center gap-3 rounded-lg border bg-card p-3">
               <s.icon className={`h-5 w-5 ${s.color}`} />
               <div>
-                <p className="text-2xl font-bold font-mono">{s.value}</p>
+                <p className="text-xl md:text-2xl font-bold font-mono">{s.value}</p>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </div>
@@ -71,7 +71,7 @@ const Index = () => {
       </header>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto p-6">
+      <div className="flex-1 overflow-x-auto p-4 md:p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             Carregando...
