@@ -8,28 +8,54 @@ import { Client } from "@/lib/supabase-types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { AddClientDialog } from "@/components/AddClientDialog";
+import { EditClientDialog } from "@/components/EditClientDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { logAudit } from "@/lib/audit";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ITEMS_PER_PAGE = 20;
 
 const Clients = () => {
   const { data: clients, isLoading } = useClients();
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const { hidden, toggle, mask } = usePrivacyMode();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
+  const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers } = useResellers(isPanelAdmin ? tenantId : undefined);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [search, setSearch] = useState("");
   const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [page, setPage] = useState(1);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reseller map for showing creator
+  const resellerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    resellers?.forEach(r => map.set(r.id, r.display_name));
+    return map;
+  }, [resellers]);
 
   const filtered = useMemo(() => {
     if (!clients) return [];
@@ -57,7 +83,6 @@ const Clients = () => {
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const title = isReseller ? "Meus Clientes" : "Clientes";
 
   const handleSendMessage = (e: React.MouseEvent, phone?: string | null) => {
@@ -66,6 +91,81 @@ const Clients = () => {
     const cleanPhone = phone.replace(/\D/g, "");
     window.open(`https://wa.me/${cleanPhone}`, "_blank");
   };
+
+  const handleRenewClient = async (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const currentDate = new Date(client.expiration_date + "T12:00:00");
+      const newDate = new Date(currentDate);
+      newDate.setMonth(newDate.getMonth() + 1);
+      const newDateStr = newDate.toISOString().split("T")[0];
+
+      const { error } = await supabase
+        .from("clients")
+        .update({ expiration_date: newDateStr })
+        .eq("id", client.id);
+      if (error) throw error;
+      await logAudit(user.id, "client_renewed", "client", client.id, { old_date: client.expiration_date, new_date: newDateStr });
+      toast({ title: "Renovado!", description: `${client.name} renovado até ${format(newDate, "dd/MM/yyyy", { locale: ptBR })}` });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleToggleSuspend = async (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .update({ is_suspended: !client.is_suspended })
+        .eq("id", client.id);
+      if (error) throw error;
+      await logAudit(user.id, client.is_suspended ? "client_unblocked" : "client_blocked", "client", client.id);
+      toast({ title: client.is_suspended ? "Desbloqueado!" : "Bloqueado!" });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const openDeleteClient = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation();
+    setDeletingClient(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteClient = async () => {
+    if (!deletingClient || !user) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("clients")
+        .delete()
+        .eq("id", deletingClient.id);
+      if (error) throw error;
+      await logAudit(user.id, "client_deleted", "client", deletingClient.id, { name: deletingClient.name });
+      toast({ title: "Excluído!", description: `${deletingClient.name} foi removido.` });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      setDeleteDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const getCreatorName = (client: Client) => {
+    if (client.reseller_id) {
+      return resellerMap.get(client.reseller_id) || "-";
+    }
+    return "-";
+  };
+
+  // Show creator column for panel_admin and super_admin
+  const showCreator = isPanelAdmin || isSuperAdmin;
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -127,17 +227,18 @@ const Clients = () => {
               <TableHead>Plano</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
+              {showCreator && <TableHead>#Criador</TableHead>}
               <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={showCreator ? 7 : 6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
+                <TableCell colSpan={showCreator ? 7 : 6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
               </TableRow>
             ) : (
               paged.map((client) => {
@@ -151,17 +252,27 @@ const Clients = () => {
                       {format(new Date(client.expiration_date + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
                     <TableCell><StatusBadge status={status} size="sm" /></TableCell>
+                    {showCreator && (
+                      <TableCell className="text-sm text-muted-foreground">{getCreatorName(client)}</TableCell>
+                    )}
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => handleSendMessage(e, client.phone)}
-                        disabled={!client.phone}
-                        title="Enviar mensagem via WhatsApp"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }} title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleRenewClient(e, client)} title="Renovar (+1 mês)">
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleSendMessage(e, client.phone)} disabled={!client.phone} title="WhatsApp">
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleToggleSuspend(e, client)} title={client.is_suspended ? "Desbloquear" : "Bloquear"}>
+                          {client.is_suspended ? <CheckCircle className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => openDeleteClient(e, client)} title="Excluir">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -190,6 +301,30 @@ const Clients = () => {
         open={!!selectedClient}
         onOpenChange={(open) => !open && setSelectedClient(null)}
       />
+
+      <EditClientDialog
+        client={editingClient}
+        open={!!editingClient}
+        onOpenChange={(open) => !open && setEditingClient(null)}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cliente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deletingClient?.name}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteClient} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -10,9 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -28,6 +32,19 @@ const Resellers = () => {
   const [email, setEmail] = useState("");
   const [maxClients, setMaxClients] = useState(50);
   const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingReseller, setEditingReseller] = useState<Reseller | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMaxClients, setEditMaxClients] = useState(50);
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingReseller, setDeletingReseller] = useState<Reseller | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -84,6 +101,61 @@ const Resellers = () => {
       queryClient.invalidateQueries({ queryKey: ["resellers"] });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const openEdit = (reseller: Reseller) => {
+    setEditingReseller(reseller);
+    setEditName(reseller.display_name);
+    setEditMaxClients(reseller.limits?.max_clients || 50);
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editingReseller || !user || !editName.trim()) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from("resellers")
+        .update({
+          display_name: editName.trim(),
+          limits: { ...editingReseller.limits, max_clients: editMaxClients },
+        })
+        .eq("id", editingReseller.id);
+      if (error) throw error;
+      await logAudit(user.id, "reseller_updated", "reseller", editingReseller.id, { display_name: editName });
+      toast({ title: "Atualizado!", description: `${editName} foi atualizado.` });
+      queryClient.invalidateQueries({ queryKey: ["resellers"] });
+      setEditOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const openDelete = (reseller: Reseller) => {
+    setDeletingReseller(reseller);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingReseller || !user) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("resellers")
+        .delete()
+        .eq("id", deletingReseller.id);
+      if (error) throw error;
+      await logAudit(user.id, "reseller_deleted", "reseller", deletingReseller.id, { display_name: deletingReseller.display_name });
+      toast({ title: "Excluído!", description: `${deletingReseller.display_name} foi removido.` });
+      queryClient.invalidateQueries({ queryKey: ["resellers"] });
+      setDeleteDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -166,14 +238,22 @@ const Resellers = () => {
                     {r.limits?.max_clients || "∞"} clientes
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleToggleStatus(r)}
-                      title={r.status === "active" ? "Suspender" : "Reativar"}
-                    >
-                      {r.status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(r)} title="Editar">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleToggleStatus(r)}
+                        title={r.status === "active" ? "Suspender" : "Reativar"}
+                      >
+                        {r.status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDelete(r)} title="Excluir">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -195,6 +275,46 @@ const Resellers = () => {
           </div>
         </div>
       )}
+
+      {/* Edit Reseller Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Revendedor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome de exibição</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Máx. Clientes</Label>
+              <Input type="number" value={editMaxClients} onChange={(e) => setEditMaxClients(Number(e.target.value))} />
+            </div>
+            <Button onClick={handleEdit} disabled={editSaving || !editName.trim()} className="w-full">
+              {editSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir revendedor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deletingReseller?.display_name}</strong>? Clientes vinculados podem ficar sem revendedor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
