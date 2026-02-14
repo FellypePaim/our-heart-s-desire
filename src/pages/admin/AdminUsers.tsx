@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getStatusFromDate } from "@/lib/status";
@@ -29,6 +29,8 @@ const roleLabels: Record<string, string> = {
   reseller: "Revendedor",
   user: "Cliente Final",
 };
+
+const ITEMS_PER_PAGE = 20;
 
 type SortDir = "asc" | "desc" | null;
 type SortState = { key: string; dir: SortDir };
@@ -88,6 +90,10 @@ const AdminUsers = () => {
   const [filterRole, setFilterRole] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("all");
   const [editingClient, setEditingClient] = useState<any>(null);
+  const [pageAll, setPageAll] = useState(1);
+  const [pageClients, setPageClients] = useState(1);
+  const [pageResellers, setPageResellers] = useState(1);
+  const [pageMasters, setPageMasters] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -117,7 +123,14 @@ const AdminUsers = () => {
     const list = allClients?.filter((c: any) => {
       if (!search) return true;
       const q = search.toLowerCase();
-      return c.name.toLowerCase().includes(q) || c.phone?.includes(q) || (c.plan || "").toLowerCase().includes(q);
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.phone?.includes(q) ||
+        (c.plan || "").toLowerCase().includes(q) ||
+        (c.servidor || "").toLowerCase().includes(q) ||
+        (c.aplicativo || "").toLowerCase().includes(q) ||
+        (c.captacao || "").toLowerCase().includes(q)
+      );
     }) || [];
     return clientSort.sortFn(list, (item: any, key) => {
       if (key === "status") return getStatusFromDate(item.expiration_date).label;
@@ -153,6 +166,21 @@ const AdminUsers = () => {
       return (item as any)[key];
     });
   }, [roles, search, masterSort.sortFn, tenantMap]);
+
+  // Reset pages on search change
+  useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [search, filterRole]);
+
+  // Pagination helpers
+  const paginate = <T,>(items: T[], page: number) => {
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    return items.slice(start, start + ITEMS_PER_PAGE);
+  };
+  const totalPages = (total: number) => Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+
+  const pagedRoles = paginate(filteredRoles, pageAll);
+  const pagedClients = paginate(filteredClients, pageClients);
+  const pagedResellers = paginate(filteredResellers, pageResellers);
+  const pagedMasters = paginate(filteredMasters, pageMasters);
 
   if (!loading && !isSuperAdmin) return <Navigate to="/" replace />;
 
@@ -217,6 +245,24 @@ const AdminUsers = () => {
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
+  };
+
+  const PaginationBar = ({ page, total, setPage }: { page: number; total: number; setPage: (p: number) => void }) => {
+    const tp = totalPages(total);
+    if (tp <= 1) return null;
+    return (
+      <div className="flex items-center justify-between px-2 py-3 text-sm text-muted-foreground">
+        <span>{total} registros • Página {page} de {tp}</span>
+        <div className="flex gap-1">
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= tp} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   const ActionButtons = ({ onEdit, onRenew, onMessage }: { onEdit?: () => void; onRenew?: () => void; onMessage?: () => void }) => (
@@ -300,7 +346,7 @@ const AdminUsers = () => {
                 ) : filteredRoles.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
                 ) : (
-                  filteredRoles.map((r) => (
+                  pagedRoles.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs max-w-[120px] truncate">{r.user_id}</TableCell>
                       <TableCell>
@@ -340,6 +386,7 @@ const AdminUsers = () => {
               </TableBody>
             </Table>
           </div>
+          <PaginationBar page={pageAll} total={filteredRoles.length} setPage={setPageAll} />
         </TabsContent>
 
         {/* Tab: Clientes Finais */}
@@ -368,7 +415,7 @@ const AdminUsers = () => {
                 ) : filteredClients.length === 0 ? (
                   <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell></TableRow>
                 ) : (
-                  filteredClients.map((client: any) => {
+                  pagedClients.map((client: any) => {
                     const status = getStatusFromDate(client.expiration_date);
                     return (
                       <TableRow key={client.id}>
@@ -403,6 +450,7 @@ const AdminUsers = () => {
               </TableBody>
             </Table>
           </div>
+          <PaginationBar page={pageClients} total={filteredClients.length} setPage={setPageClients} />
         </TabsContent>
 
         {/* Tab: Revendedores */}
@@ -425,7 +473,7 @@ const AdminUsers = () => {
                 ) : filteredResellers.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
                 ) : (
-                  filteredResellers.map((r) => (
+                  pagedResellers.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.display_name}</TableCell>
                       <TableCell>
@@ -452,6 +500,7 @@ const AdminUsers = () => {
               </TableBody>
             </Table>
           </div>
+          <PaginationBar page={pageResellers} total={filteredResellers.length} setPage={setPageResellers} />
         </TabsContent>
 
         {/* Tab: Masters */}
@@ -473,7 +522,7 @@ const AdminUsers = () => {
                 ) : filteredMasters.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum master encontrado</TableCell></TableRow>
                 ) : (
-                  filteredMasters.map((r) => (
+                  pagedMasters.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs max-w-[120px] truncate">{r.user_id}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -506,6 +555,7 @@ const AdminUsers = () => {
               </TableBody>
             </Table>
           </div>
+          <PaginationBar page={pageMasters} total={filteredMasters.length} setPage={setPageMasters} />
         </TabsContent>
       </Tabs>
 
