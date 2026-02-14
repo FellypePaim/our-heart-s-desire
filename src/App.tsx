@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
 import Clients from "./pages/Clients";
+import Resellers from "./pages/Resellers";
 import Messages from "./pages/Messages";
 import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
@@ -59,6 +60,7 @@ function ProtectedLayout() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/clients" element={<Clients />} />
+            <Route path="/resellers" element={<Resellers />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />

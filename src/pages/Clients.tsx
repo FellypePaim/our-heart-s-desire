@@ -1,11 +1,14 @@
 import { useState, useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
+import { useResellers } from "@/hooks/useResellers";
+import { useAuth } from "@/hooks/useAuth";
 import { getStatusFromDate } from "@/lib/status";
 import { Client } from "@/lib/supabase-types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,17 +16,35 @@ import { Search, Users } from "lucide-react";
 
 const Clients = () => {
   const { data: clients, isLoading } = useClients();
+  const { roles } = useAuth();
+  const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
+  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
+  const { data: resellers } = useResellers(isPanelAdmin ? tenantId : undefined);
+  
   const [search, setSearch] = useState("");
+  const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const filtered = useMemo(() => {
     if (!clients) return [];
-    if (!search) return clients;
-    const q = search.toLowerCase();
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.phone?.includes(q) || c.plan.toLowerCase().includes(q)
-    );
-  }, [clients, search]);
+    let result = clients;
+    
+    // Filter by reseller (panel admin only)
+    if (isPanelAdmin && resellerFilter !== "all") {
+      result = result.filter((c) => c.reseller_id === resellerFilter);
+    }
+    
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c) => c.name.toLowerCase().includes(q) || c.phone?.includes(q) || c.plan.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [clients, search, resellerFilter, isPanelAdmin]);
+
+  const title = isReseller ? "Meus Clientes" : "Clientes";
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -31,7 +52,7 @@ const Clients = () => {
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
             <Users className="h-5 w-5 md:h-6 md:w-6" />
-            Clientes
+            {title}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {clients?.length || 0} clientes cadastrados
@@ -40,14 +61,29 @@ const Clients = () => {
         <AddClientDialog />
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome, telefone ou plano..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, telefone ou plano..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {isPanelAdmin && resellers && resellers.length > 0 && (
+          <Select value={resellerFilter} onValueChange={setResellerFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar revendedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os revendedores</SelectItem>
+              {resellers.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.display_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="rounded-lg border bg-card overflow-x-auto">

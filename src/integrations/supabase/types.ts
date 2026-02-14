@@ -57,6 +57,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           plan: string | null
+          reseller_id: string | null
           tenant_id: string | null
           updated_at: string
           user_id: string
@@ -70,6 +71,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           plan?: string | null
+          reseller_id?: string | null
           tenant_id?: string | null
           updated_at?: string
           user_id: string
@@ -83,11 +85,19 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           plan?: string | null
+          reseller_id?: string | null
           tenant_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "resellers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -227,6 +237,47 @@ export type Database = {
         }
         Relationships: []
       }
+      resellers: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          limits: Json
+          owner_user_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          limits?: Json
+          owner_user_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          limits?: Json
+          owner_user_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resellers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -304,12 +355,17 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: boolean
       }
+      get_user_reseller_id: { Args: { _user_id: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_panel_admin: {
+        Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
