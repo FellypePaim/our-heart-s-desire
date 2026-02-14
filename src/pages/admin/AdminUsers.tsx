@@ -278,32 +278,46 @@ const AdminUsers = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>WhatsApp</TableHead>
-                  <TableHead>Plano</TableHead>
+                  <TableHead>Telefone</TableHead>
                   <TableHead>Vencimento</TableHead>
+                  <TableHead>Plano</TableHead>
+                  <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Servidor</TableHead>
+                  <TableHead>Telas</TableHead>
+                  <TableHead className="hidden lg:table-cell">Aplicativo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Dispositivo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Captação</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {clientsLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filteredClients.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell></TableRow>
                 ) : (
-                  filteredClients.map((client) => {
+                  filteredClients.map((client: any) => {
                     const status = getStatusFromDate(client.expiration_date);
                     return (
                       <TableRow key={client.id}>
                         <TableCell className="font-medium">{client.name}</TableCell>
                         <TableCell className="text-muted-foreground">{client.phone || "-"}</TableCell>
-                        <TableCell>{client.plan}</TableCell>
                         <TableCell className="font-mono text-sm">
                           {format(new Date(client.expiration_date + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>{client.plan}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {client.valor ? `R$ ${Number(client.valor).toFixed(2).replace(".", ",")}` : "-"}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={status} size="sm" />
                         </TableCell>
+                        <TableCell className="text-sm">{client.servidor || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{client.telas ?? "-"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">{client.aplicativo || "-"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">{client.dispositivo || "-"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">{client.captacao || "-"}</TableCell>
                         <TableCell>
                           <ActionButtons
                             onEdit={() => toast({ title: "Editar", description: `Editar ${client.name}` })}
