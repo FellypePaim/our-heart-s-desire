@@ -18,14 +18,24 @@ export function AppSidebar() {
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
 
-  const panelItems = [
+  // Menu do Revendedor - acesso básico
+  const resellerItems = [
     { to: "/", label: "Radar", icon: LayoutDashboard },
-    { to: "/clients", label: isReseller ? "Meus Clientes" : "Clientes", icon: Users },
-    ...((isPanelAdmin || isSuperAdmin) ? [{ to: "/resellers", label: "Revendedores", icon: Users }] : []),
+    { to: "/clients", label: "Meus Clientes", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
+  // Menu do Master - acesso ao menu de Master + Revendedor
+  const masterItems = [
+    { to: "/", label: "Radar", icon: LayoutDashboard },
+    { to: "/clients", label: "Clientes", icon: Users },
+    { to: "/resellers", label: "Revendedores", icon: Users },
+    { to: "/messages", label: "Mensagens", icon: MessageSquare },
+    { to: "/settings", label: "Configurações", icon: Settings },
+  ];
+
+  // Menu do SuperAdmin - acesso completo
   const superAdminItems = [
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/tenants", label: "Painéis", icon: Building2 },
@@ -33,6 +43,23 @@ export function AppSidebar() {
     { to: "/admin/settings", label: "Config. Globais", icon: Settings },
     { to: "/admin/audit", label: "Auditoria", icon: Crown },
   ];
+
+  // Determina quais itens do painel exibir baseado no cargo
+  const getPanelItems = () => {
+    if (isReseller) return resellerItems;
+    if (isPanelAdmin) return masterItems;
+    // Para superadmin ou user genérico, mostra menu completo do master
+    return masterItems;
+  };
+
+  const panelItems = getPanelItems();
+
+  const getRoleLabel = () => {
+    if (isSuperAdmin) return "SuperAdmin";
+    if (isPanelAdmin) return "Master";
+    if (isReseller) return "Revendedor";
+    return "Usuário";
+  };
 
   const renderNavItem = (item: { to: string; label: string; icon: any }) => {
     const Icon = item.icon;
@@ -64,7 +91,7 @@ export function AppSidebar() {
         <div className="min-w-0">
           <h1 className="font-bold text-sm text-sidebar-primary">IPTV Radar</h1>
           <p className="text-xs text-sidebar-foreground/60 truncate">
-            {isSuperAdmin ? "SuperAdmin" : "Painel Operacional"}
+            {getRoleLabel()}
           </p>
         </div>
         <button
@@ -83,6 +110,7 @@ export function AppSidebar() {
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        {/* Menu SuperAdmin - apenas para superadmins */}
         {isSuperAdmin && (
           <>
             <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
@@ -93,11 +121,11 @@ export function AppSidebar() {
           </>
         )}
 
+        {/* Menu do Painel - baseado no cargo */}
         <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-          Painel
+          {isReseller ? "Revendedor" : isPanelAdmin ? "Master" : "Painel"}
         </p>
         {panelItems.map(renderNavItem)}
-
       </nav>
 
       <div className="border-t border-sidebar-border p-3 space-y-2">

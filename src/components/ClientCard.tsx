@@ -2,7 +2,8 @@ import { Client } from "@/lib/supabase-types";
 import { getStatusFromDate } from "@/lib/status";
 import { StatusBadge } from "./StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Phone, User, Calendar, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Phone, User, Calendar, Package, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,13 @@ interface ClientCardProps {
 
 export function ClientCard({ client, onClick }: ClientCardProps) {
   const status = getStatusFromDate(client.expiration_date);
+
+  const handleSendMessage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!client.phone) return;
+    const cleanPhone = client.phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${cleanPhone}`, "_blank");
+  };
 
   return (
     <Card
@@ -40,6 +48,17 @@ export function ClientCard({ client, onClick }: ClientCardProps) {
               )}
             </div>
           </div>
+          {client.phone && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onClick={handleSendMessage}
+              title="Enviar mensagem via WhatsApp"
+            >
+              <MessageSquare className="h-3.5 w-3.5 text-green-600" />
+            </Button>
+          )}
         </div>
         <StatusBadge status={status} size="sm" />
         <div className="flex items-center justify-between text-xs text-muted-foreground">

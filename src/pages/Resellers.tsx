@@ -31,7 +31,8 @@ const Resellers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  if (!loading && !isPanelAdmin) return <Navigate to="/" replace />;
+  const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
+  if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
 
   const filtered = resellers?.filter((r) =>
     r.display_name.toLowerCase().includes(search.toLowerCase())
