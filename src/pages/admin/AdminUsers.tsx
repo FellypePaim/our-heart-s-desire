@@ -15,7 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, Filter, X } from "lucide-react";
+import { getAllStatuses, type StatusKey } from "@/lib/status";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getStatusFromDate } from "@/lib/status";
@@ -94,6 +97,11 @@ const AdminUsers = () => {
   const [pageClients, setPageClients] = useState(1);
   const [pageResellers, setPageResellers] = useState(1);
   const [pageMasters, setPageMasters] = useState(1);
+  // Advanced filters for clients tab
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterServidor, setFilterServidor] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -103,6 +111,13 @@ const AdminUsers = () => {
   const allSort = useSort();
 
   const tenantMap = useMemo(() => new Map(tenants?.map((t) => [t.id, t.name]) || []), [tenants]);
+
+  // Unique servidores for filter
+  const uniqueServidores = useMemo(() => {
+    const set = new Set<string>();
+    allClients?.forEach((c: any) => { if (c.servidor) set.add(c.servidor); });
+    return Array.from(set).sort();
+  }, [allClients]);
 
   // --- Filtered data ---
   const filteredRoles = useMemo(() => {
@@ -121,16 +136,36 @@ const AdminUsers = () => {
 
   const filteredClients = useMemo(() => {
     const list = allClients?.filter((c: any) => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.phone?.includes(q) ||
-        (c.plan || "").toLowerCase().includes(q) ||
-        (c.servidor || "").toLowerCase().includes(q) ||
-        (c.aplicativo || "").toLowerCase().includes(q) ||
-        (c.captacao || "").toLowerCase().includes(q)
-      );
+      // Text search
+      if (search) {
+        const q = search.toLowerCase();
+        const matches = c.name.toLowerCase().includes(q) ||
+          c.phone?.includes(q) ||
+          (c.plan || "").toLowerCase().includes(q) ||
+          (c.servidor || "").toLowerCase().includes(q) ||
+          (c.aplicativo || "").toLowerCase().includes(q) ||
+          (c.captacao || "").toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      // Status filter
+      if (filterStatus !== "all") {
+        const st = getStatusFromDate(c.expiration_date);
+        if (st.key !== filterStatus) return false;
+      }
+      // Servidor filter
+      if (filterServidor !== "all") {
+        if ((c.servidor || "") !== filterServidor) return false;
+      }
+      // Date range filter
+      if (filterDateFrom) {
+        const exp = new Date(c.expiration_date + "T12:00:00");
+        if (exp < filterDateFrom) return false;
+      }
+      if (filterDateTo) {
+        const exp = new Date(c.expiration_date + "T12:00:00");
+        if (exp > filterDateTo) return false;
+      }
+      return true;
     }) || [];
     return clientSort.sortFn(list, (item: any, key) => {
       if (key === "status") return getStatusFromDate(item.expiration_date).label;
@@ -138,7 +173,7 @@ const AdminUsers = () => {
       if (key === "telas") return Number(item.telas) || 0;
       return item[key];
     });
-  }, [allClients, search, clientSort.sortFn]);
+  }, [allClients, search, filterStatus, filterServidor, filterDateFrom, filterDateTo, clientSort.sortFn]);
 
   const filteredResellers = useMemo(() => {
     const list = allResellers?.filter((r) => {
@@ -167,8 +202,52 @@ const AdminUsers = () => {
     });
   }, [roles, search, masterSort.sortFn, tenantMap]);
 
-  // Reset pages on search change
-  useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [search, filterRole]);
+  // Reset pages on search/filter change
+  useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [search, filterRole, filterStatus, filterServidor, filterDateFrom, filterDateTo]);
+
+  // CSV export helper
+  const exportCSV = useCallback((filename: string, headers: string[], rows: string[][]) => {
+    const bom = "\uFEFF";
+    const csv = bom + [headers.join(";"), ...rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const exportCurrentTab = useCallback(() => {
+    if (activeTab === "all") {
+      exportCSV("usuarios", ["User ID", "Cargo", "Painel", "Status", "Data"], filteredRoles.map(r => [
+        r.user_id, roleLabels[r.role] || r.role, r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
+        r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
+      ]));
+    } else if (activeTab === "clients") {
+      exportCSV("clientes", ["Nome", "Telefone", "Vencimento", "Plano", "Valor", "Status", "Servidor", "Telas", "Aplicativo", "Dispositivo", "Captação"],
+        filteredClients.map((c: any) => [
+          c.name, c.phone || "", format(new Date(c.expiration_date + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR }),
+          c.plan || "", c.valor ? Number(c.valor).toFixed(2).replace(".", ",") : "",
+          getStatusFromDate(c.expiration_date).label, c.servidor || "", String(c.telas ?? ""),
+          c.aplicativo || "", c.dispositivo || "", c.captacao || ""
+        ]));
+    } else if (activeTab === "resellers") {
+      exportCSV("revendedores", ["Nome", "Status", "Clientes", "Limite", "Painel"], filteredResellers.map(r => [
+        r.display_name, r.status === "active" ? "Ativo" : "Suspenso", String(r.client_count || 0),
+        String(r.limits?.max_clients || "∞"), tenantMap.get(r.tenant_id) || r.tenant_id
+      ]));
+    } else if (activeTab === "masters") {
+      exportCSV("masters", ["User ID", "Painel", "Status", "Data"], filteredMasters.map(r => [
+        r.user_id, r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
+        r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
+      ]));
+    }
+    toast({ title: "Exportado!", description: "Arquivo CSV gerado com sucesso." });
+  }, [activeTab, filteredRoles, filteredClients, filteredResellers, filteredMasters, tenantMap, exportCSV, toast]);
+
+  const hasActiveFilters = filterStatus !== "all" || filterServidor !== "all" || !!filterDateFrom || !!filterDateTo;
+  const clearFilters = () => { setFilterStatus("all"); setFilterServidor("all"); setFilterDateFrom(undefined); setFilterDateTo(undefined); };
 
   // Pagination helpers
   const paginate = <T,>(items: T[], page: number) => {
@@ -305,24 +384,78 @@ const AdminUsers = () => {
           <TabsTrigger value="masters">Masters</TabsTrigger>
         </TabsList>
 
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <div className="flex flex-col gap-3 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            </div>
+            {activeTab === "all" && (
+              <Select value={filterRole} onValueChange={setFilterRole}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="super_admin">SuperAdmin</SelectItem>
+                  <SelectItem value="panel_admin">Master</SelectItem>
+                  <SelectItem value="reseller">Revendedor</SelectItem>
+                  <SelectItem value="user">Cliente Final</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Button variant="outline" size="sm" onClick={exportCurrentTab} className="gap-2">
+              <Download className="h-4 w-4" /> Exportar CSV
+            </Button>
           </div>
-          {activeTab === "all" && (
-            <Select value={filterRole} onValueChange={setFilterRole}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrar por cargo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="super_admin">SuperAdmin</SelectItem>
-                <SelectItem value="panel_admin">Master</SelectItem>
-                <SelectItem value="reseller">Revendedor</SelectItem>
-                <SelectItem value="user">Cliente Final</SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Advanced filters for clients tab */}
+          {activeTab === "clients" && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[160px] h-9 text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  {getAllStatuses().map(s => (
+                    <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterServidor} onValueChange={setFilterServidor}>
+                <SelectTrigger className="w-[160px] h-9 text-xs">
+                  <SelectValue placeholder="Servidor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos servidores</SelectItem>
+                  {uniqueServidores.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 text-xs gap-1">
+                    {filterDateFrom ? format(filterDateFrom, "dd/MM/yy") : "De"} – {filterDateTo ? format(filterDateTo, "dd/MM/yy") : "Até"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="start">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-muted-foreground font-medium">Vencimento de:</p>
+                    <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} />
+                    <p className="text-xs text-muted-foreground font-medium">Até:</p>
+                    <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-xs gap-1">
+                  <X className="h-3 w-3" /> Limpar filtros
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
