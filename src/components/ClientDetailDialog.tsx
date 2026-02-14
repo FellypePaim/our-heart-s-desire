@@ -3,6 +3,7 @@ import { Client } from "@/lib/supabase-types";
 import { getStatusFromDate } from "@/lib/status";
 import { StatusBadge } from "./StatusBadge";
 import { EditClientDialog } from "./EditClientDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ export function ClientDetailDialog({ client, open, onOpenChange }: ClientDetailD
   const [renewDate, setRenewDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -160,11 +162,7 @@ export function ClientDetailDialog({ client, open, onOpenChange }: ClientDetailD
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  if (!client.phone) return;
-                  const cleanPhone = client.phone.replace(/\D/g, "");
-                  window.open(`https://wa.me/${cleanPhone}`, "_blank");
-                }}
+                onClick={() => setMessageOpen(true)}
                 disabled={!client.phone}
                 className="flex-1 gap-1.5 text-green-600 hover:text-green-700"
                 title="Enviar mensagem via WhatsApp"
@@ -190,6 +188,12 @@ export function ClientDetailDialog({ client, open, onOpenChange }: ClientDetailD
         client={client}
         open={editOpen}
         onOpenChange={setEditOpen}
+      />
+
+      <WhatsAppMessageDialog
+        client={client}
+        open={messageOpen}
+        onOpenChange={setMessageOpen}
       />
     </>
   );

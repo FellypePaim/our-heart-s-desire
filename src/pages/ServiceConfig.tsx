@@ -21,6 +21,7 @@ const categoryLabels: Record<string, string> = {
   server: "Servidores",
   app: "Aplicativos",
   device: "Dispositivos",
+  captacao: "Captação",
 };
 
 const planConfigFields = [
@@ -59,7 +60,7 @@ const ServiceConfig = () => {
   const openCreate = () => {
     setEditing(null);
     setFormName("");
-    setFormConfig(tab === "plan" ? { price: 0, credits: 1, screens: 1, duration_months: 1 } : tab === "server" ? { cost_per_credit: 0 } : {});
+    setFormConfig(tab === "plan" ? { price: 0, credits: 1, screens: 1, duration_months: 1 } : tab === "server" ? { cost_per_credit: 0 } : tab === "captacao" ? {} : {});
     setEditOpen(true);
   };
 
@@ -134,9 +135,10 @@ const ServiceConfig = () => {
           <TabsTrigger value="server">Servidores</TabsTrigger>
           <TabsTrigger value="app">Aplicativos</TabsTrigger>
           <TabsTrigger value="device">Dispositivos</TabsTrigger>
+          <TabsTrigger value="captacao">Captação</TabsTrigger>
         </TabsList>
 
-        {["plan", "server", "app", "device"].map((cat) => (
+        {["plan", "server", "app", "device", "captacao"].map((cat) => (
           <TabsContent key={cat} value={cat}>
             <div className="rounded-lg border bg-card overflow-x-auto">
               <Table>

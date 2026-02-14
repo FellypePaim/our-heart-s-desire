@@ -42,7 +42,6 @@ export function AppSidebar() {
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/tenants", label: "Painéis", icon: Building2 },
     { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
-    { to: "/admin/settings", label: "Config. Globais", icon: Settings },
     { to: "/admin/audit", label: "Log de Atividades", icon: Crown },
   ];
 
