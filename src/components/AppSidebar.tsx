@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut, Radar,
-  Crown, Building2, Shield, Globe, Moon, Sun, Menu, X
+  Crown, Building2, Shield, Globe, Moon, Sun, Menu, X, Server
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -23,6 +23,7 @@ export function AppSidebar() {
     { to: "/", label: "Radar", icon: LayoutDashboard },
     { to: "/clients", label: "Meus Clientes", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
+    { to: "/service-config", label: "Servidores & Planos", icon: Server },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
@@ -32,6 +33,7 @@ export function AppSidebar() {
     { to: "/clients", label: "Clientes", icon: Users },
     { to: "/resellers", label: "Revendedores", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
+    { to: "/service-config", label: "Servidores & Planos", icon: Server },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
@@ -41,7 +43,7 @@ export function AppSidebar() {
     { to: "/admin/tenants", label: "Painéis", icon: Building2 },
     { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
     { to: "/admin/settings", label: "Config. Globais", icon: Settings },
-    { to: "/admin/audit", label: "Auditoria", icon: Crown },
+    { to: "/admin/audit", label: "Log de Atividades", icon: Crown },
   ];
 
   // Determina quais itens do painel exibir baseado no cargo

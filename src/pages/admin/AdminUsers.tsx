@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { validateWhatsAppPhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -128,6 +129,8 @@ const AdminUsers = () => {
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newPhoneError, setNewPhoneError] = useState("");
   const [newRole, setNewRole] = useState<string>("user");
   const [newTenantId, setNewTenantId] = useState<string>("none");
   const [creating, setCreating] = useState(false);
@@ -493,6 +496,23 @@ const AdminUsers = () => {
             <div className="space-y-2">
               <Label>Nome</Label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do usuário" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input
+                value={newPhone}
+                onChange={(e) => {
+                  setNewPhone(e.target.value);
+                  if (e.target.value.trim()) {
+                    const { valid, error } = validateWhatsAppPhone(e.target.value);
+                    setNewPhoneError(valid ? "" : error || "");
+                  } else {
+                    setNewPhoneError("");
+                  }
+                }}
+                placeholder="(DD) 9XXXX-XXXX"
+              />
+              {newPhoneError && <p className="text-xs text-destructive">{newPhoneError}</p>}
             </div>
             <div className="space-y-2">
               <Label>E-mail *</Label>

@@ -1,22 +1,26 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyReseller } from "@/hooks/useResellers";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServiceOptions } from "@/hooks/useServiceOptions";
+import { validateWhatsAppPhone } from "@/lib/phone";
 
 export function AddClientDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [plan, setPlan] = useState("Mensal");
+  const [phoneError, setPhoneError] = useState("");
+  const [plan, setPlan] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [notes, setNotes] = useState("");
   const [valor, setValor] = useState("");
@@ -30,34 +34,61 @@ export function AddClientDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { data: plans } = useServiceOptions("plan");
+  const { data: servers } = useServiceOptions("server");
+  const { data: apps } = useServiceOptions("app");
+  const { data: devices } = useServiceOptions("device");
+
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
 
   const resetForm = () => {
-    setName("");
-    setPhone("");
-    setPlan("Mensal");
-    setExpirationDate("");
-    setNotes("");
-    setValor("");
-    setServidor("");
-    setTelas("1");
-    setAplicativo("");
-    setDispositivo("");
-    setCaptacao("");
+    setName(""); setPhone(""); setPhoneError(""); setPlan(""); setExpirationDate("");
+    setNotes(""); setValor(""); setServidor(""); setTelas("1"); setAplicativo("");
+    setDispositivo(""); setCaptacao("");
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    if (value.trim()) {
+      const { valid, error } = validateWhatsAppPhone(value);
+      setPhoneError(valid ? "" : error || "");
+    } else {
+      setPhoneError("");
+    }
+  };
+
+  const handlePlanChange = (planName: string) => {
+    setPlan(planName);
+    const planOpt = plans?.find(p => p.name === planName);
+    if (planOpt?.config) {
+      if (planOpt.config.price) setValor(String(planOpt.config.price));
+      if (planOpt.config.screens) setTelas(String(planOpt.config.screens));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    setLoading(true);
 
+    // Validate phone
+    if (phone.trim()) {
+      const { valid, error } = validateWhatsAppPhone(phone);
+      if (!valid) {
+        setPhoneError(error || "Número inválido");
+        return;
+      }
+    }
+
+    setLoading(true);
     try {
+      const cleanedPhone = phone.trim() ? validateWhatsAppPhone(phone).cleaned : null;
+
       const insertData: any = {
         user_id: user.id,
         name,
-        phone: phone || null,
-        plan,
+        phone: cleanedPhone,
+        plan: plan || null,
         expiration_date: expirationDate,
         notes: notes || null,
         valor: valor ? Number(valor) : 0,
@@ -104,13 +135,29 @@ export function AddClientDialog() {
               <Label htmlFor="name">Nome *</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Nome do cliente" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" />
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="phone">WhatsApp *</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="(DD) 9XXXX-XXXX"
+                required
+              />
+              {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="plan">Plano</Label>
-              <Input id="plan" value={plan} onChange={(e) => setPlan(e.target.value)} placeholder="Mensal, Trimestral..." />
+              <Select value={plan} onValueChange={handlePlanChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans?.map(p => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="expiration">Vencimento *</Label>
@@ -122,7 +169,16 @@ export function AddClientDialog() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="servidor">Servidor</Label>
-              <Input id="servidor" value={servidor} onChange={(e) => setServidor(e.target.value)} placeholder="Ex: BRAVE" />
+              <Select value={servidor} onValueChange={setServidor}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {servers?.map(s => (
+                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="telas">Telas</Label>
@@ -130,11 +186,29 @@ export function AddClientDialog() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="aplicativo">Aplicativo</Label>
-              <Input id="aplicativo" value={aplicativo} onChange={(e) => setAplicativo(e.target.value)} placeholder="Ex: XCIPTV" />
+              <Select value={aplicativo} onValueChange={setAplicativo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {apps?.map(a => (
+                    <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dispositivo">Dispositivo</Label>
-              <Input id="dispositivo" value={dispositivo} onChange={(e) => setDispositivo(e.target.value)} placeholder="Ex: Smart TV" />
+              <Select value={dispositivo} onValueChange={setDispositivo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices?.map(d => (
+                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="captacao">Captação</Label>
@@ -145,7 +219,7 @@ export function AddClientDialog() {
               <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionais..." />
             </div>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !!phoneError}>
             {loading ? "Salvando..." : "Adicionar Cliente"}
           </Button>
         </form>
