@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useResellers, Reseller } from "@/hooks/useResellers";
 import { Navigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -18,19 +18,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+}
+
 const ITEMS_PER_PAGE = 20;
 
 const Resellers = () => {
   const { user, roles, loading } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
+  const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+
+  // Create reseller via edge function state
   const [createOpen, setCreateOpen] = useState(false);
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [maxClients, setMaxClients] = useState(50);
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newMaxClients, setNewMaxClients] = useState(50);
   const [saving, setSaving] = useState(false);
 
   // Edit state
@@ -45,10 +55,35 @@ const Resellers = () => {
   const [deletingReseller, setDeletingReseller] = useState<Reseller | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // User profiles for #Criador column
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
+  // Fetch user profiles for creator names (only for superadmin or panel admin)
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const fetchProfiles = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("get-user-profiles");
+        if (error) throw error;
+        setProfiles(data || []);
+      } catch (e: any) {
+        console.error("Failed to fetch profiles:", e);
+      }
+    };
+    fetchProfiles();
+  }, [isSuperAdmin]);
+
+  const getOwnerName = (ownerUserId: string) => {
+    // For panel admin, if it's their own user, show "Eu"
+    if (ownerUserId === user?.id) return "Eu";
+    const p = profileMap.get(ownerUserId);
+    return p?.name || p?.email?.split("@")[0] || ownerUserId.slice(0, 8);
+  };
+
   if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
 
   const filtered = resellers?.filter((r) =>
@@ -59,27 +94,43 @@ const Resellers = () => {
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const handleCreate = async () => {
-    if (!displayName.trim() || !email.trim() || !user || !tenantId) return;
+    if (!newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || !user) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("resellers").insert({
-        tenant_id: tenantId,
-        owner_user_id: user.id,
-        display_name: displayName.trim(),
-        limits: { max_clients: maxClients, max_messages_month: 500 },
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: {
+          email: newEmail.trim(),
+          password: newPassword,
+          name: newDisplayName.trim(),
+          role: "reseller",
+          tenant_id: tenantId,
+        },
       });
-
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Update reseller limits if different from default
+      if (newMaxClients !== 50 && data?.user_id) {
+        await supabase.from("resellers")
+          .update({ limits: { max_clients: newMaxClients, max_messages_month: 500 } })
+          .eq("owner_user_id", data.user_id);
+      }
 
       await logAudit(user.id, "reseller_created", "reseller", undefined, { 
-        display_name: displayName, tenant_id: tenantId 
+        display_name: newDisplayName, email: newEmail, tenant_id: tenantId 
       });
-      toast({ title: "Revendedor criado!", description: `${displayName} foi cadastrado.` });
+      toast({ title: "Revendedor criado!", description: `${newDisplayName} (${newEmail}) foi cadastrado com acesso.` });
       queryClient.invalidateQueries({ queryKey: ["resellers"] });
+      // Refresh profiles
+      if (isSuperAdmin) {
+        const { data: profilesData } = await supabase.functions.invoke("get-user-profiles");
+        if (profilesData) setProfiles(profilesData);
+      }
       setCreateOpen(false);
-      setDisplayName("");
-      setEmail("");
-      setMaxClients(50);
+      setNewDisplayName("");
+      setNewEmail("");
+      setNewPassword("");
+      setNewMaxClients(50);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -172,35 +223,9 @@ const Resellers = () => {
           </p>
         </div>
 
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Revendedor
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Revendedor</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome de exibição *</Label>
-                <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nome do revendedor" />
-              </div>
-              <div className="space-y-2">
-                <Label>E-mail do usuário *</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" />
-              </div>
-              <div className="space-y-2">
-                <Label>Máx. Clientes</Label>
-                <Input type="number" value={maxClients} onChange={(e) => setMaxClients(Number(e.target.value))} />
-              </div>
-              <Button onClick={handleCreate} disabled={saving || !displayName.trim()} className="w-full">
-                {saving ? "Criando..." : "Criar Revendedor"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4" /> Novo Revendedor
+        </Button>
       </div>
 
       <div className="relative max-w-sm">
@@ -216,14 +241,15 @@ const Resellers = () => {
               <TableHead>Status</TableHead>
               <TableHead>Clientes</TableHead>
               <TableHead className="hidden md:table-cell">Limite</TableHead>
+              <TableHead className="hidden md:table-cell">#Criador</TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : paged.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
             ) : (
               paged.map((r) => (
                 <TableRow key={r.id}>
@@ -236,6 +262,9 @@ const Resellers = () => {
                   <TableCell className="font-mono">{r.client_count || 0}</TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground font-mono">
                     {r.limits?.max_clients || "∞"} clientes
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {getOwnerName(r.owner_user_id)}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -275,6 +304,42 @@ const Resellers = () => {
           </div>
         </div>
       )}
+
+      {/* Create Reseller Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar Revendedor</DialogTitle>
+            <DialogDescription>
+              Crie uma conta de revendedor com acesso ao sistema
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome de exibição *</Label>
+              <Input value={newDisplayName} onChange={(e) => setNewDisplayName(e.target.value)} placeholder="Nome do revendedor" />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail *</Label>
+              <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemplo.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha *</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div className="space-y-2">
+              <Label>Máx. Clientes</Label>
+              <Input type="number" value={newMaxClients} onChange={(e) => setNewMaxClients(Number(e.target.value))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={saving || !newDisplayName.trim() || !newEmail.trim() || !newPassword.trim()}>
+              {saving ? "Criando..." : "Criar Revendedor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Reseller Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

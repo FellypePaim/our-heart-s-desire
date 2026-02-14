@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useAllUserRoles, useTenants, useAllClients } from "@/hooks/useSuperAdmin";
-import { useResellers } from "@/hooks/useResellers";
+import { useAllUserRoles, useTenants } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { Navigate } from "react-router-dom";
@@ -10,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,11 +22,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2 } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Client } from "@/lib/supabase-types";
-import { EditClientDialog } from "@/components/EditClientDialog";
 
 const roleLabels: Record<string, string> = {
   super_admin: "SuperAdmin",
@@ -35,7 +33,6 @@ const roleLabels: Record<string, string> = {
   user: "Cliente Final",
 };
 
-// Hierarchy level: higher number = higher rank
 const roleRank: Record<string, number> = {
   user: 0,
   reseller: 1,
@@ -107,7 +104,6 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
   const { hidden, toggle: togglePrivacy } = usePrivacyMode();
   const [filterRole, setFilterRole] = useState<string>("all");
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [page, setPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -126,6 +122,15 @@ const AdminUsers = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<{ userId: string; roleId: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Create user state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState<string>("user");
+  const [newTenantId, setNewTenantId] = useState<string>("none");
+  const [creating, setCreating] = useState(false);
 
   const allSort = useSort();
 
@@ -151,7 +156,6 @@ const AdminUsers = () => {
     return p?.name || p?.email?.split("@")[0] || userId.slice(0, 8);
   }, [profileMap]);
 
-  // Build creator: hierarchy inference
   const getCreator = useCallback((role: any) => {
     if (role.role === "super_admin") return "-";
     if (role.role === "panel_admin" && role.tenant_id) {
@@ -165,9 +169,7 @@ const AdminUsers = () => {
     return "-";
   }, [roles, getUserName]);
 
-  // Check if current user can act on target role (hierarchy enforcement)
   const canActOn = useCallback((targetRole: string) => {
-    // SuperAdmin can act on everyone except other super_admins
     return roleRank[targetRole] < roleRank["super_admin"];
   }, []);
 
@@ -252,7 +254,6 @@ const AdminUsers = () => {
     }
   };
 
-  // --- Role change ---
   const openRoleModal = (userId: string, currentRole: string, roleId: string) => {
     setRoleModalUser({ userId, currentRole, roleId });
     setSelectedNewRole(currentRole);
@@ -283,7 +284,6 @@ const AdminUsers = () => {
     }
   };
 
-  // --- Delete user role ---
   const openDeleteDialog = (userId: string, roleId: string) => {
     setDeletingUser({ userId, roleId, name: getUserName(userId) });
     setDeleteDialogOpen(true);
@@ -309,16 +309,56 @@ const AdminUsers = () => {
     }
   };
 
+  // --- Create user ---
+  const handleCreateUser = async () => {
+    if (!newEmail.trim() || !newPassword.trim() || !newRole) return;
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: {
+          email: newEmail.trim(),
+          password: newPassword,
+          name: newName.trim() || undefined,
+          role: newRole,
+          tenant_id: newTenantId === "none" ? null : newTenantId,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await logAudit(user!.id, "user_created", "user", data.user_id, { email: newEmail, role: newRole });
+      toast({ title: "Usuário criado!", description: `${newEmail} com cargo ${roleLabels[newRole]}` });
+      queryClient.invalidateQueries({ queryKey: ["all_user_roles"] });
+      // Refresh profiles
+      const { data: profilesData } = await supabase.functions.invoke("get-user-profiles");
+      if (profilesData) setProfiles(profilesData);
+      setCreateOpen(false);
+      setNewEmail("");
+      setNewPassword("");
+      setNewName("");
+      setNewRole("user");
+      setNewTenantId("none");
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Shield className="h-5 w-5 md:h-6 md:w-6" />
-          Gestão de Usuários
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {filteredRoles.length} usuários • Visão completa do sistema
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Shield className="h-5 w-5 md:h-6 md:w-6" />
+            Gestão de Usuários
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {filteredRoles.length} usuários • Visão completa do sistema
+          </p>
+        </div>
+        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4" /> Novo Usuário
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -437,11 +477,67 @@ const AdminUsers = () => {
         </div>
       )}
 
-      <EditClientDialog
-        client={editingClient}
-        open={!!editingClient}
-        onOpenChange={(open) => !open && setEditingClient(null)}
-      />
+      {/* Create User Modal */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Criar Novo Usuário
+            </DialogTitle>
+            <DialogDescription>
+              Crie uma conta com cargo e painel associado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do usuário" />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail *</Label>
+              <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemplo.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha *</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div className="space-y-2">
+              <Label>Cargo *</Label>
+              <Select value={newRole} onValueChange={setNewRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="panel_admin">Master</SelectItem>
+                  <SelectItem value="reseller">Revendedor</SelectItem>
+                  <SelectItem value="user">Cliente Final</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Painel (Tenant)</Label>
+              <Select value={newTenantId} onValueChange={setNewTenantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um painel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {tenants?.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={creating || !newEmail.trim() || !newPassword.trim()}>
+              {creating ? "Criando..." : "Criar Usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Role Change Modal */}
       <Dialog open={roleModalOpen} onOpenChange={setRoleModalOpen}>
