@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ITEMS_PER_PAGE = 20;
 
 const Resellers = () => {
   const { user, roles, loading } = useAuth();
@@ -20,6 +22,7 @@ const Resellers = () => {
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -34,27 +37,16 @@ const Resellers = () => {
     r.display_name.toLowerCase().includes(search.toLowerCase())
   ) || [];
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
   const handleCreate = async () => {
     if (!displayName.trim() || !email.trim() || !user || !tenantId) return;
     setSaving(true);
     try {
-      // Create the user account for the reseller via edge function or direct signup
-      // For now, we create the reseller record. The user account should exist or be invited.
-      // We'll use a simplified approach: create reseller with a placeholder user_id
-      // In production, this would trigger an invitation flow.
-      
-      // For MVP: admin provides an existing user email, we look up their ID
-      const { data: existingRoles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "reseller")
-        .limit(1000);
-
-      // Create the reseller record - owner_user_id will be set when user accepts invite
-      // For now, use a simple approach: create user_role + reseller together
       const { error } = await supabase.from("resellers").insert({
         tenant_id: tenantId,
-        owner_user_id: user.id, // placeholder, will be updated
+        owner_user_id: user.id,
         display_name: displayName.trim(),
         limits: { max_clients: maxClients, max_messages_month: 500 },
       });
@@ -140,7 +132,7 @@ const Resellers = () => {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar revendedores..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <Input placeholder="Buscar revendedores..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
       </div>
 
       <div className="rounded-lg border bg-card overflow-x-auto">
@@ -157,10 +149,10 @@ const Resellers = () => {
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-            ) : filtered.length === 0 ? (
+            ) : paged.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
             ) : (
-              filtered.map((r) => (
+              paged.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.display_name}</TableCell>
                   <TableCell>
@@ -188,6 +180,20 @@ const Resellers = () => {
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-3 text-sm text-muted-foreground">
+          <span>{filtered.length} registros • Página {page} de {totalPages}</span>
+          <div className="flex gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

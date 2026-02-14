@@ -1,15 +1,46 @@
-import { useGlobalStats, useTenants, useAllClients } from "@/hooks/useSuperAdmin";
+import { useMemo } from "react";
+import { useGlobalStats, useAllClients } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { getStatusFromDate } from "@/lib/status";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getStatusFromDate, getAllStatuses } from "@/lib/status";
 import {
   Globe, Building2, Users, UserCheck, AlertTriangle, TrendingDown,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
 const AdminDashboard = () => {
   const { isSuperAdmin, loading } = useAuth();
   const { data: stats, isLoading } = useGlobalStats();
+  const { data: allClients } = useAllClients();
+
+  // Status distribution chart data
+  const statusDistribution = useMemo(() => {
+    if (!allClients) return [];
+    const counts: Record<string, number> = {};
+    allClients.forEach((c) => {
+      const status = getStatusFromDate(c.expiration_date);
+      counts[status.key] = (counts[status.key] || 0) + 1;
+    });
+    const allStatuses = getAllStatuses();
+    return allStatuses
+      .map((s) => ({ name: s.label, value: counts[s.key] || 0, key: s.key }))
+      .filter((d) => d.value > 0);
+  }, [allClients]);
+
+  // Server distribution chart data
+  const serverDistribution = useMemo(() => {
+    if (!allClients) return [];
+    const counts: Record<string, number> = {};
+    allClients.forEach((c) => {
+      const srv = c.servidor || "Sem servidor";
+      counts[srv] = (counts[srv] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [allClients]);
 
   if (!loading && !isSuperAdmin) return <Navigate to="/" replace />;
 
@@ -21,6 +52,20 @@ const AdminDashboard = () => {
     { label: "Inadimplentes", value: stats?.overdueClients ?? 0, icon: AlertTriangle, color: "text-status-expired" },
     { label: "Taxa Inadimplência", value: `${stats?.overdueRate ?? 0}%`, icon: TrendingDown, color: "text-status-post1" },
   ];
+
+
+  const STATUS_COLORS: Record<string, string> = {
+    active: "hsl(142, 60%, 40%)",
+    pre3: "hsl(45, 80%, 48%)",
+    pre2: "hsl(38, 85%, 50%)",
+    pre1: "hsl(28, 90%, 50%)",
+    today: "hsl(15, 95%, 50%)",
+    post1: "hsl(5, 85%, 50%)",
+    post2: "hsl(0, 80%, 45%)",
+    expired: "hsl(0, 70%, 35%)",
+  };
+
+  const BAR_COLORS = ["hsl(220, 25%, 30%)", "hsl(220, 25%, 45%)", "hsl(220, 25%, 60%)", "hsl(220, 25%, 70%)"];
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -51,6 +96,65 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Status Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Distribuição por Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statusDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={statusDistribution}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                  >
+                    {statusDistribution.map((entry) => (
+                      <Cell key={entry.key} fill={STATUS_COLORS[entry.key] || "#888"} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Server Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Clientes por Servidor</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {serverDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={serverDistribution} layout="vertical">
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Clientes" radius={[0, 4, 4, 0]}>
+                    {serverDistribution.map((_, i) => (
+                      <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

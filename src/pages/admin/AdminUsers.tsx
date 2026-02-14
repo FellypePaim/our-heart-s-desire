@@ -92,7 +92,7 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("all");
-  const [editingClient, setEditingClient] = useState<any>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [pageAll, setPageAll] = useState(1);
   const [pageClients, setPageClients] = useState(1);
   const [pageResellers, setPageResellers] = useState(1);
@@ -202,8 +202,9 @@ const AdminUsers = () => {
     });
   }, [roles, search, masterSort.sortFn, tenantMap]);
 
-  // Reset pages on search/filter change
-  useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [search, filterRole, filterStatus, filterServidor, filterDateFrom, filterDateTo]);
+  // Reset pages on search/filter change - NOT useMemo, use proper pattern
+  const filterKey = `${search}|${filterRole}|${filterStatus}|${filterServidor}|${filterDateFrom}|${filterDateTo}`;
+  useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [filterKey]);
 
   // CSV export helper
   const exportCSV = useCallback((filename: string, headers: string[], rows: string[][]) => {
