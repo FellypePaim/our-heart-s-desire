@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAllUserRoles, useTenants, useAllClients } from "@/hooks/useSuperAdmin";
 import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,8 +16,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, Filter, X } from "lucide-react";
-import { getAllStatuses, type StatusKey } from "@/lib/status";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, Filter, X, UserCog, Trash2 } from "lucide-react";
+import { getAllStatuses } from "@/lib/status";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -38,6 +45,13 @@ const ITEMS_PER_PAGE = 20;
 
 type SortDir = "asc" | "desc" | null;
 type SortState = { key: string; dir: SortDir };
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  created_at: string;
+}
 
 function SortableHead({ label, sortKey, sort, onSort, className }: { label: string; sortKey: string; sort: SortState; onSort: (key: string) => void; className?: string }) {
   return (
@@ -99,13 +113,27 @@ const AdminUsers = () => {
   const [pageClients, setPageClients] = useState(1);
   const [pageResellers, setPageResellers] = useState(1);
   const [pageMasters, setPageMasters] = useState(1);
-  // Advanced filters for clients tab
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterServidor, setFilterServidor] = useState<string>("all");
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // User profiles state
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
+
+  // Role change modal state
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [roleModalUser, setRoleModalUser] = useState<{ userId: string; currentRole: string; roleId: string } | null>(null);
+  const [selectedNewRole, setSelectedNewRole] = useState<string>("");
+  const [roleChanging, setRoleChanging] = useState(false);
+
+  // Delete user state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<{ userId: string; roleId: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const clientSort = useSort();
   const resellerSort = useSort();
@@ -114,31 +142,71 @@ const AdminUsers = () => {
 
   const tenantMap = useMemo(() => new Map(tenants?.map((t) => [t.id, t.name]) || []), [tenants]);
 
-  // Unique servidores for filter
+  // Fetch user profiles
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const fetchProfiles = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("get-user-profiles");
+        if (error) throw error;
+        setProfiles(data || []);
+      } catch (e: any) {
+        console.error("Failed to fetch profiles:", e);
+      }
+    };
+    fetchProfiles();
+  }, [isSuperAdmin]);
+
+  const getUserName = useCallback((userId: string) => {
+    const p = profileMap.get(userId);
+    return p?.name || p?.email?.split("@")[0] || userId.slice(0, 8);
+  }, [profileMap]);
+
+  // Build creator map: for each user, find their "parent"
+  // reseller → panel_admin of same tenant; panel_admin → super_admin; super_admin → "-"
+  const getCreator = useCallback((role: any) => {
+    if (role.role === "super_admin") return "-";
+    if (role.role === "panel_admin" && role.tenant_id) {
+      // Creator is any super_admin (we show first one)
+      const sa = roles?.find(r => r.role === "super_admin" && r.is_active);
+      return sa ? getUserName(sa.user_id) : "-";
+    }
+    if (role.role === "reseller" && role.tenant_id) {
+      // Creator is panel_admin of same tenant
+      const pa = roles?.find(r => r.role === "panel_admin" && r.tenant_id === role.tenant_id && r.is_active);
+      return pa ? getUserName(pa.user_id) : "-";
+    }
+    return "-";
+  }, [roles, getUserName]);
+
   const uniqueServidores = useMemo(() => {
     const set = new Set<string>();
     allClients?.forEach((c: any) => { if (c.servidor) set.add(c.servidor); });
     return Array.from(set).sort();
   }, [allClients]);
 
-  // --- Filtered data ---
   const filteredRoles = useMemo(() => {
     const list = roles?.filter((r) => {
       if (filterRole !== "all" && r.role !== filterRole) return false;
-      if (search && !r.user_id.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const name = getUserName(r.user_id).toLowerCase();
+        if (!name.includes(q) && !r.user_id.toLowerCase().includes(q)) return false;
+      }
       return true;
     }) || [];
     return allSort.sortFn(list, (item, key) => {
+      if (key === "name") return getUserName(item.user_id);
       if (key === "role") return roleLabels[item.role] || item.role;
       if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
       if (key === "created_at") return item.created_at;
+      if (key === "creator") return getCreator(item);
       return (item as any)[key];
     });
-  }, [roles, filterRole, search, allSort.sortFn]);
+  }, [roles, filterRole, search, allSort.sortFn, getUserName, getCreator]);
 
   const filteredClients = useMemo(() => {
     const list = allClients?.filter((c: any) => {
-      // Text search
       if (search) {
         const q = search.toLowerCase();
         const matches = c.name.toLowerCase().includes(q) ||
@@ -149,16 +217,13 @@ const AdminUsers = () => {
           (c.captacao || "").toLowerCase().includes(q);
         if (!matches) return false;
       }
-      // Status filter
       if (filterStatus !== "all") {
         const st = getStatusFromDate(c.expiration_date);
         if (st.key !== filterStatus) return false;
       }
-      // Servidor filter
       if (filterServidor !== "all") {
         if ((c.servidor || "") !== filterServidor) return false;
       }
-      // Date range filter
       if (filterDateFrom) {
         const exp = new Date(c.expiration_date + "T12:00:00");
         if (exp < filterDateFrom) return false;
@@ -195,20 +260,21 @@ const AdminUsers = () => {
     const masterRoles = roles?.filter((r) => r.role === "panel_admin") || [];
     const list = masterRoles.filter((r) => {
       if (!search) return true;
-      return r.user_id.toLowerCase().includes(search.toLowerCase());
+      const name = getUserName(r.user_id).toLowerCase();
+      return name.includes(search.toLowerCase()) || r.user_id.toLowerCase().includes(search.toLowerCase());
     });
     return masterSort.sortFn(list, (item, key) => {
+      if (key === "name") return getUserName(item.user_id);
       if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
       if (key === "tenant") return item.tenant_id ? tenantMap.get(item.tenant_id) || "" : "";
+      if (key === "creator") return getCreator(item);
       return (item as any)[key];
     });
-  }, [roles, search, masterSort.sortFn, tenantMap]);
+  }, [roles, search, masterSort.sortFn, tenantMap, getUserName, getCreator]);
 
-  // Reset pages on search/filter change - NOT useMemo, use proper pattern
   const filterKey = `${search}|${filterRole}|${filterStatus}|${filterServidor}|${filterDateFrom}|${filterDateTo}`;
   useMemo(() => { setPageAll(1); setPageClients(1); setPageResellers(1); setPageMasters(1); }, [filterKey]);
 
-  // CSV export helper
   const exportCSV = useCallback((filename: string, headers: string[], rows: string[][]) => {
     const bom = "\uFEFF";
     const csv = bom + [headers.join(";"), ...rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(";"))].join("\n");
@@ -223,9 +289,9 @@ const AdminUsers = () => {
 
   const exportCurrentTab = useCallback(() => {
     if (activeTab === "all") {
-      exportCSV("usuarios", ["User ID", "Cargo", "Painel", "Status", "Data"], filteredRoles.map(r => [
-        r.user_id, roleLabels[r.role] || r.role, r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
-        r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
+      exportCSV("usuarios", ["Nome", "Cargo", "Painel", "Criador", "Status", "Data"], filteredRoles.map(r => [
+        getUserName(r.user_id), roleLabels[r.role] || r.role, r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
+        getCreator(r), r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
       ]));
     } else if (activeTab === "clients") {
       exportCSV("clientes", ["Nome", "Telefone", "Vencimento", "Plano", "Valor", "Status", "Servidor", "Telas", "Aplicativo", "Dispositivo", "Captação"],
@@ -241,18 +307,17 @@ const AdminUsers = () => {
         String(r.limits?.max_clients || "∞"), tenantMap.get(r.tenant_id) || r.tenant_id
       ]));
     } else if (activeTab === "masters") {
-      exportCSV("masters", ["User ID", "Painel", "Status", "Data"], filteredMasters.map(r => [
-        r.user_id, r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
-        r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
+      exportCSV("masters", ["Nome", "Painel", "Criador", "Status", "Data"], filteredMasters.map(r => [
+        getUserName(r.user_id), r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
+        getCreator(r), r.is_active ? "Ativo" : "Bloqueado", format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
       ]));
     }
     toast({ title: "Exportado!", description: "Arquivo CSV gerado com sucesso." });
-  }, [activeTab, filteredRoles, filteredClients, filteredResellers, filteredMasters, tenantMap, exportCSV, toast]);
+  }, [activeTab, filteredRoles, filteredClients, filteredResellers, filteredMasters, tenantMap, exportCSV, toast, getUserName, getCreator]);
 
   const hasActiveFilters = filterStatus !== "all" || filterServidor !== "all" || !!filterDateFrom || !!filterDateTo;
   const clearFilters = () => { setFilterStatus("all"); setFilterServidor("all"); setFilterDateFrom(undefined); setFilterDateTo(undefined); };
 
-  // Pagination helpers
   const paginate = <T,>(items: T[], page: number) => {
     const start = (page - 1) * ITEMS_PER_PAGE;
     return items.slice(start, start + ITEMS_PER_PAGE);
@@ -326,6 +391,63 @@ const AdminUsers = () => {
       queryClient.invalidateQueries({ queryKey: ["all_clients"] });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // --- Role change ---
+  const openRoleModal = (userId: string, currentRole: string, roleId: string) => {
+    setRoleModalUser({ userId, currentRole, roleId });
+    setSelectedNewRole(currentRole);
+    setRoleModalOpen(true);
+  };
+
+  const handleRoleChange = async () => {
+    if (!roleModalUser || !user || !selectedNewRole || selectedNewRole === roleModalUser.currentRole) return;
+    setRoleChanging(true);
+    try {
+      const { error } = await supabase
+        .from("user_roles")
+        .update({ role: selectedNewRole as "super_admin" | "panel_admin" | "reseller" | "user" })
+        .eq("id", roleModalUser.roleId);
+      if (error) throw error;
+      await logAudit(user.id, "role_changed", "user_role", roleModalUser.roleId, {
+        target_user: roleModalUser.userId,
+        old_role: roleModalUser.currentRole,
+        new_role: selectedNewRole,
+      });
+      toast({ title: "Cargo alterado!", description: `${getUserName(roleModalUser.userId)}: ${roleLabels[roleModalUser.currentRole]} → ${roleLabels[selectedNewRole]}` });
+      queryClient.invalidateQueries({ queryKey: ["all_user_roles"] });
+      setRoleModalOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setRoleChanging(false);
+    }
+  };
+
+  // --- Delete user role ---
+  const openDeleteDialog = (userId: string, roleId: string) => {
+    setDeletingUser({ userId, roleId, name: getUserName(userId) });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser || !user) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("id", deletingUser.roleId);
+      if (error) throw error;
+      await logAudit(user.id, "user_role_deleted", "user_role", deletingUser.roleId, { target_user: deletingUser.userId });
+      toast({ title: "Excluído!", description: `Cargo de ${deletingUser.name} removido.` });
+      queryClient.invalidateQueries({ queryKey: ["all_user_roles"] });
+      setDeleteDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -421,7 +543,6 @@ const AdminUsers = () => {
             </Button>
           </div>
 
-          {/* Advanced filters for clients tab */}
           {activeTab === "clients" && (
             <div className="flex flex-wrap gap-2 items-center">
               <Filter className="h-4 w-4 text-muted-foreground" />
@@ -477,9 +598,10 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableHead label="User ID" sortKey="user_id" sort={allSort.sort} onSort={allSort.toggle} />
+                  <SortableHead label="Nome" sortKey="name" sort={allSort.sort} onSort={allSort.toggle} />
                   <SortableHead label="Cargo" sortKey="role" sort={allSort.sort} onSort={allSort.toggle} />
                   <SortableHead label="Painel" sortKey="tenant_id" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
+                  <SortableHead label="#Criador" sortKey="creator" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
                   <SortableHead label="Status" sortKey="status" sort={allSort.sort} onSort={allSort.toggle} />
                   <SortableHead label="Data" sortKey="created_at" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
                   <TableHead>Ações</TableHead>
@@ -487,13 +609,13 @@ const AdminUsers = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filteredRoles.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
                 ) : (
                   pagedRoles.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{hidden ? "••••••••" : r.user_id}</TableCell>
+                      <TableCell className="font-medium">{hidden ? "••••••••" : getUserName(r.user_id)}</TableCell>
                       <TableCell>
                         <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                           {roleLabels[r.role] || r.role}
@@ -501,6 +623,9 @@ const AdminUsers = () => {
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id.slice(0, 8) : "-"}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {hidden ? "••••" : getCreator(r)}
                       </TableCell>
                       <TableCell>
                         <Badge variant={r.is_active ? "default" : "destructive"}>
@@ -512,16 +637,21 @@ const AdminUsers = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openRoleModal(r.user_id, r.role, r.id)} title="Alterar cargo">
+                            <UserCog className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleToggleActive(r.id, r.is_active, r.user_id)} title={r.is_active ? "Bloquear" : "Desbloquear"}>
                             {r.is_active ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="icon" title="Editar">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
                           {r.role !== "super_admin" && (
-                            <Button variant="ghost" size="icon" onClick={() => handleImpersonate(r.user_id, r.tenant_id)} title="Impersonate">
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => handleImpersonate(r.user_id, r.tenant_id)} title="Impersonate">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(r.user_id, r.id)} title="Excluir">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -654,8 +784,9 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableHead label="User ID" sortKey="user_id" sort={masterSort.sort} onSort={masterSort.toggle} />
+                  <SortableHead label="Nome" sortKey="name" sort={masterSort.sort} onSort={masterSort.toggle} />
                   <SortableHead label="Painel" sortKey="tenant" sort={masterSort.sort} onSort={masterSort.toggle} />
+                  <SortableHead label="#Criador" sortKey="creator" sort={masterSort.sort} onSort={masterSort.toggle} className="hidden md:table-cell" />
                   <SortableHead label="Status" sortKey="status" sort={masterSort.sort} onSort={masterSort.toggle} />
                   <SortableHead label="Data" sortKey="created_at" sort={masterSort.sort} onSort={masterSort.toggle} className="hidden md:table-cell" />
                   <TableHead>Ações</TableHead>
@@ -663,15 +794,18 @@ const AdminUsers = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filteredMasters.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum master encontrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum master encontrado</TableCell></TableRow>
                 ) : (
                   pagedMasters.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{hidden ? "••••••••" : r.user_id}</TableCell>
+                      <TableCell className="font-medium">{hidden ? "••••••••" : getUserName(r.user_id)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id.slice(0, 8) : "-"}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {hidden ? "••••" : getCreator(r)}
                       </TableCell>
                       <TableCell>
                         <Badge variant={r.is_active ? "default" : "destructive"}>
@@ -683,14 +817,17 @@ const AdminUsers = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openRoleModal(r.user_id, r.role, r.id)} title="Alterar cargo">
+                            <UserCog className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleToggleActive(r.id, r.is_active, r.user_id)} title={r.is_active ? "Bloquear" : "Desbloquear"}>
                             {r.is_active ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="icon" title="Editar">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleImpersonate(r.user_id, r.tenant_id)} title="Impersonate">
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(r.user_id, r.id)} title="Excluir">
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -709,6 +846,70 @@ const AdminUsers = () => {
         open={!!editingClient}
         onOpenChange={(open) => !open && setEditingClient(null)}
       />
+
+      {/* Role Change Modal */}
+      <Dialog open={roleModalOpen} onOpenChange={setRoleModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5" />
+              Alterar Cargo
+            </DialogTitle>
+            <DialogDescription>
+              {roleModalUser && `Alterar cargo de ${getUserName(roleModalUser.userId)}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Cargo atual</p>
+              <Badge variant="secondary" className="text-sm">
+                {roleModalUser ? roleLabels[roleModalUser.currentRole] || roleModalUser.currentRole : ""}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-2">Novo cargo</p>
+              <Select value={selectedNewRole} onValueChange={setSelectedNewRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="super_admin">SuperAdmin</SelectItem>
+                  <SelectItem value="panel_admin">Master</SelectItem>
+                  <SelectItem value="reseller">Revendedor</SelectItem>
+                  <SelectItem value="user">Cliente Final</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleModalOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleRoleChange}
+              disabled={roleChanging || selectedNewRole === roleModalUser?.currentRole}
+            >
+              {roleChanging ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover o cargo de <strong>{deletingUser?.name}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
