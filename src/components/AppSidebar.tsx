@@ -21,7 +21,7 @@ export function AppSidebar() {
   const panelItems = [
     { to: "/", label: "Radar", icon: LayoutDashboard },
     { to: "/clients", label: isReseller ? "Meus Clientes" : "Clientes", icon: Users },
-    ...(isPanelAdmin ? [{ to: "/resellers", label: "Revendedores", icon: Users }] : []),
+    ...((isPanelAdmin || isSuperAdmin) ? [{ to: "/resellers", label: "Revendedores", icon: Users }] : []),
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
@@ -97,6 +97,7 @@ export function AppSidebar() {
           Painel
         </p>
         {panelItems.map(renderNavItem)}
+
       </nav>
 
       <div className="border-t border-sidebar-border p-3 space-y-2">
