@@ -7,9 +7,10 @@ interface DashboardColumnProps {
   status: StatusConfig;
   clients: Client[];
   onClientClick?: (client: Client) => void;
+  maskPhone?: (value: string | null | undefined, type: "phone") => string;
 }
 
-export function DashboardColumn({ status, clients, onClientClick }: DashboardColumnProps) {
+export function DashboardColumn({ status, clients, onClientClick, maskPhone }: DashboardColumnProps) {
   const Icon = status.icon;
   
   return (
@@ -46,6 +47,7 @@ export function DashboardColumn({ status, clients, onClientClick }: DashboardCol
               key={client.id}
               client={client}
               onClick={() => onClientClick?.(client)}
+              maskPhone={maskPhone}
             />
           ))
         )}

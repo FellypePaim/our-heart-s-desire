@@ -1,15 +1,18 @@
 import { useState, useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { getStatusFromDate, DASHBOARD_COLUMNS, getAllStatuses, StatusKey } from "@/lib/status";
 import { Client } from "@/lib/supabase-types";
 import { DashboardColumn } from "@/components/DashboardColumn";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { AddClientDialog } from "@/components/AddClientDialog";
-import { Radar, Users, AlertTriangle, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Radar, Users, AlertTriangle, CheckCircle, Eye, EyeOff } from "lucide-react";
 
 const Index = () => {
   const { data: clients, isLoading } = useClients();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const { hidden, toggle, mask } = usePrivacyMode();
 
   const groupedClients = useMemo(() => {
     if (!clients) return {} as Record<StatusKey, Client[]>;
@@ -48,7 +51,18 @@ const Index = () => {
               Antecipe riscos antes que os problemas ocorram
             </p>
           </div>
-          <AddClientDialog />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggle}
+              title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
+              className="h-9 w-9"
+            >
+              {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <AddClientDialog />
+          </div>
         </div>
 
         {/* Stats */}
@@ -86,6 +100,7 @@ const Index = () => {
                   status={statusConfig}
                   clients={groupedClients[key] || []}
                   onClientClick={setSelectedClient}
+                  maskPhone={hidden ? mask : undefined}
                 />
               );
             })}
