@@ -35,11 +35,12 @@ const Clients = () => {
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
-  const { data: resellers } = useResellers(isPanelAdmin ? tenantId : undefined);
+  const { data: resellers } = useResellers((isPanelAdmin || isSuperAdmin) ? tenantId : undefined);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const [search, setSearch] = useState("");
+  const [ownershipFilter, setOwnershipFilter] = useState<string>("mine");
   const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -60,7 +61,13 @@ const Clients = () => {
   const filtered = useMemo(() => {
     if (!clients) return [];
     let result = clients;
-    if (isPanelAdmin && resellerFilter !== "all") {
+
+    // Ownership filter - "mine" shows only user's own clients
+    if (ownershipFilter === "mine") {
+      result = result.filter((c) => c.user_id === user?.id);
+    }
+    // For panel admin, allow filtering by reseller
+    if ((isPanelAdmin || isSuperAdmin) && resellerFilter !== "all") {
       result = result.filter((c) => c.reseller_id === resellerFilter);
     }
     if (search) {
@@ -76,9 +83,9 @@ const Clients = () => {
       );
     }
     return result;
-  }, [clients, search, resellerFilter, isPanelAdmin]);
+  }, [clients, search, ownershipFilter, resellerFilter, isPanelAdmin, isSuperAdmin, user?.id]);
 
-  useMemo(() => { setPage(1); }, [search, resellerFilter]);
+  useMemo(() => { setPage(1); }, [search, ownershipFilter, resellerFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -176,7 +183,7 @@ const Clients = () => {
             {title}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {clients?.length || 0} clientes cadastrados
+            {filtered.length} de {clients?.length || 0} clientes
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -203,7 +210,16 @@ const Clients = () => {
             className="pl-9"
           />
         </div>
-        {isPanelAdmin && resellers && resellers.length > 0 && (
+        <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mine">Meus Clientes Finais</SelectItem>
+            <SelectItem value="all">Todos os Clientes</SelectItem>
+          </SelectContent>
+        </Select>
+        {(isPanelAdmin || isSuperAdmin) && resellers && resellers.length > 0 && (
           <Select value={resellerFilter} onValueChange={setResellerFilter}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Filtrar revendedor" />
