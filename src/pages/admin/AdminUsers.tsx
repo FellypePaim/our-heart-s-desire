@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAllUserRoles, useTenants, useAllClients } from "@/hooks/useSuperAdmin";
 import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,13 +15,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getStatusFromDate } from "@/lib/status";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Client } from "@/lib/supabase-types";
-import { Reseller } from "@/hooks/useResellers";
+import { EditClientDialog } from "@/components/EditClientDialog";
 
 const roleLabels: Record<string, string> = {
   super_admin: "SuperAdmin",
@@ -29,6 +29,54 @@ const roleLabels: Record<string, string> = {
   reseller: "Revendedor",
   user: "Cliente Final",
 };
+
+type SortDir = "asc" | "desc" | null;
+type SortState = { key: string; dir: SortDir };
+
+function SortableHead({ label, sortKey, sort, onSort, className }: { label: string; sortKey: string; sort: SortState; onSort: (key: string) => void; className?: string }) {
+  return (
+    <TableHead className={className}>
+      <button onClick={() => onSort(sortKey)} className="flex items-center gap-1 hover:text-foreground transition-colors">
+        {label}
+        {sort.key === sortKey ? (
+          sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
+function useSort(initial: string = "") {
+  const [sort, setSort] = useState<SortState>({ key: initial, dir: null });
+
+  const toggle = useCallback((key: string) => {
+    setSort((prev) => {
+      if (prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      if (prev.dir === "desc") return { key: "", dir: null };
+      return { key, dir: "asc" };
+    });
+  }, []);
+
+  const sortFn = useCallback(<T,>(items: T[], accessor: (item: T, key: string) => any): T[] => {
+    if (!sort.key || !sort.dir) return items;
+    return [...items].sort((a, b) => {
+      const va = accessor(a, sort.key);
+      const vb = accessor(b, sort.key);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "string" && typeof vb === "string") {
+        return sort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      return sort.dir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+    });
+  }, [sort]);
+
+  return { sort, toggle, sortFn };
+}
 
 const AdminUsers = () => {
   const { isSuperAdmin, loading, user, setImpersonating } = useAuth();
@@ -39,50 +87,74 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("all");
+  const [editingClient, setEditingClient] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const clientSort = useSort();
+  const resellerSort = useSort();
+  const masterSort = useSort();
+  const allSort = useSort();
+
+  const tenantMap = useMemo(() => new Map(tenants?.map((t) => [t.id, t.name]) || []), [tenants]);
+
+  // --- Filtered data ---
+  const filteredRoles = useMemo(() => {
+    const list = roles?.filter((r) => {
+      if (filterRole !== "all" && r.role !== filterRole) return false;
+      if (search && !r.user_id.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    }) || [];
+    return allSort.sortFn(list, (item, key) => {
+      if (key === "role") return roleLabels[item.role] || item.role;
+      if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
+      if (key === "created_at") return item.created_at;
+      return (item as any)[key];
+    });
+  }, [roles, filterRole, search, allSort.sortFn]);
+
+  const filteredClients = useMemo(() => {
+    const list = allClients?.filter((c: any) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return c.name.toLowerCase().includes(q) || c.phone?.includes(q) || (c.plan || "").toLowerCase().includes(q);
+    }) || [];
+    return clientSort.sortFn(list, (item: any, key) => {
+      if (key === "status") return getStatusFromDate(item.expiration_date).label;
+      if (key === "valor") return Number(item.valor) || 0;
+      if (key === "telas") return Number(item.telas) || 0;
+      return item[key];
+    });
+  }, [allClients, search, clientSort.sortFn]);
+
+  const filteredResellers = useMemo(() => {
+    const list = allResellers?.filter((r) => {
+      if (!search) return true;
+      return r.display_name.toLowerCase().includes(search.toLowerCase());
+    }) || [];
+    return resellerSort.sortFn(list, (item, key) => {
+      if (key === "client_count") return item.client_count || 0;
+      if (key === "display_name") return item.display_name;
+      if (key === "status") return item.status;
+      if (key === "limit") return item.limits?.max_clients || 0;
+      return (item as any)[key];
+    });
+  }, [allResellers, search, resellerSort.sortFn]);
+
+  const filteredMasters = useMemo(() => {
+    const masterRoles = roles?.filter((r) => r.role === "panel_admin") || [];
+    const list = masterRoles.filter((r) => {
+      if (!search) return true;
+      return r.user_id.toLowerCase().includes(search.toLowerCase());
+    });
+    return masterSort.sortFn(list, (item, key) => {
+      if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
+      if (key === "tenant") return item.tenant_id ? tenantMap.get(item.tenant_id) || "" : "";
+      return (item as any)[key];
+    });
+  }, [roles, search, masterSort.sortFn, tenantMap]);
+
   if (!loading && !isSuperAdmin) return <Navigate to="/" replace />;
-
-  const tenantMap = new Map(tenants?.map((t) => [t.id, t.name]) || []);
-
-  // Build a map of user_id -> role label
-  const userRoleMap = new Map<string, string>();
-  roles?.forEach((r) => {
-    const existing = userRoleMap.get(r.user_id);
-    // Priority: super_admin > panel_admin > reseller > user
-    const priority: Record<string, number> = { super_admin: 4, panel_admin: 3, reseller: 2, user: 1 };
-    if (!existing || (priority[r.role] || 0) > (priority[existing] || 0)) {
-      userRoleMap.set(r.user_id, r.role);
-    }
-  });
-
-  // --- Tab: Todos (all user_roles) ---
-  const filteredRoles = roles?.filter((r) => {
-    if (filterRole !== "all" && r.role !== filterRole) return false;
-    if (search && !r.user_id.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  }) || [];
-
-  // --- Tab: Clientes ---
-  const filteredClients = allClients?.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return c.name.toLowerCase().includes(q) || c.phone?.includes(q) || c.plan.toLowerCase().includes(q);
-  }) || [];
-
-  // --- Tab: Revendedores ---
-  const filteredResellers = allResellers?.filter((r) => {
-    if (!search) return true;
-    return r.display_name.toLowerCase().includes(search.toLowerCase());
-  }) || [];
-
-  // --- Tab: Masters ---
-  const masterRoles = roles?.filter((r) => r.role === "panel_admin") || [];
-  const filteredMasters = masterRoles.filter((r) => {
-    if (!search) return true;
-    return r.user_id.toLowerCase().includes(search.toLowerCase());
-  });
 
   const handleToggleActive = async (roleId: string, currentActive: boolean, userId: string) => {
     if (!user) return;
@@ -126,7 +198,7 @@ const AdminUsers = () => {
     window.open(`https://wa.me/${cleanPhone}`, "_blank");
   };
 
-  const handleRenewClient = async (client: Client) => {
+  const handleRenewClient = async (client: any) => {
     if (!user) return;
     try {
       const currentDate = new Date(client.expiration_date + "T12:00:00");
@@ -187,7 +259,6 @@ const AdminUsers = () => {
           <TabsTrigger value="masters">Masters</TabsTrigger>
         </TabsList>
 
-        {/* Search bar - shared */}
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -215,11 +286,11 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User ID</TableHead>
-                  <TableHead>Cargo</TableHead>
-                  <TableHead className="hidden md:table-cell">Painel</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Data</TableHead>
+                  <SortableHead label="User ID" sortKey="user_id" sort={allSort.sort} onSort={allSort.toggle} />
+                  <SortableHead label="Cargo" sortKey="role" sort={allSort.sort} onSort={allSort.toggle} />
+                  <SortableHead label="Painel" sortKey="tenant_id" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
+                  <SortableHead label="Status" sortKey="status" sort={allSort.sort} onSort={allSort.toggle} />
+                  <SortableHead label="Data" sortKey="created_at" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -277,17 +348,17 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Servidor</TableHead>
-                  <TableHead>Telas</TableHead>
-                  <TableHead className="hidden lg:table-cell">Aplicativo</TableHead>
-                  <TableHead className="hidden lg:table-cell">Dispositivo</TableHead>
-                  <TableHead className="hidden lg:table-cell">Captação</TableHead>
+                  <SortableHead label="Nome" sortKey="name" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Telefone" sortKey="phone" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Vencimento" sortKey="expiration_date" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Plano" sortKey="plan" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Valor" sortKey="valor" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Status" sortKey="status" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Servidor" sortKey="servidor" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Telas" sortKey="telas" sort={clientSort.sort} onSort={clientSort.toggle} />
+                  <SortableHead label="Aplicativo" sortKey="aplicativo" sort={clientSort.sort} onSort={clientSort.toggle} className="hidden lg:table-cell" />
+                  <SortableHead label="Dispositivo" sortKey="dispositivo" sort={clientSort.sort} onSort={clientSort.toggle} className="hidden lg:table-cell" />
+                  <SortableHead label="Captação" sortKey="captacao" sort={clientSort.sort} onSort={clientSort.toggle} className="hidden lg:table-cell" />
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -320,7 +391,7 @@ const AdminUsers = () => {
                         <TableCell className="hidden lg:table-cell text-sm">{client.captacao || "-"}</TableCell>
                         <TableCell>
                           <ActionButtons
-                            onEdit={() => toast({ title: "Editar", description: `Editar ${client.name}` })}
+                            onEdit={() => setEditingClient(client)}
                             onRenew={() => handleRenewClient(client)}
                             onMessage={() => handleSendMessage(client.name, client.phone)}
                           />
@@ -340,10 +411,10 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Clientes</TableHead>
-                  <TableHead className="hidden md:table-cell">Limite</TableHead>
+                  <SortableHead label="Nome" sortKey="display_name" sort={resellerSort.sort} onSort={resellerSort.toggle} />
+                  <SortableHead label="Status" sortKey="status" sort={resellerSort.sort} onSort={resellerSort.toggle} />
+                  <SortableHead label="Clientes" sortKey="client_count" sort={resellerSort.sort} onSort={resellerSort.toggle} />
+                  <SortableHead label="Limite" sortKey="limit" sort={resellerSort.sort} onSort={resellerSort.toggle} className="hidden md:table-cell" />
                   <TableHead className="hidden md:table-cell">Painel</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -389,10 +460,10 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User ID</TableHead>
-                  <TableHead>Painel</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Data</TableHead>
+                  <SortableHead label="User ID" sortKey="user_id" sort={masterSort.sort} onSort={masterSort.toggle} />
+                  <SortableHead label="Painel" sortKey="tenant" sort={masterSort.sort} onSort={masterSort.toggle} />
+                  <SortableHead label="Status" sortKey="status" sort={masterSort.sort} onSort={masterSort.toggle} />
+                  <SortableHead label="Data" sortKey="created_at" sort={masterSort.sort} onSort={masterSort.toggle} className="hidden md:table-cell" />
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -437,6 +508,12 @@ const AdminUsers = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <EditClientDialog
+        client={editingClient}
+        open={!!editingClient}
+        onOpenChange={(open) => !open && setEditingClient(null)}
+      />
     </div>
   );
 };
