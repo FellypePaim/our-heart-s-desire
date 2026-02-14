@@ -10,14 +10,18 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export function AppSidebar() {
-  const { signOut, user, isSuperAdmin, impersonating } = useAuth();
+  const { signOut, user, isSuperAdmin, impersonating, roles } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
+
   const panelItems = [
     { to: "/", label: "Radar", icon: LayoutDashboard },
-    { to: "/clients", label: "Clientes", icon: Users },
+    { to: "/clients", label: isReseller ? "Meus Clientes" : "Clientes", icon: Users },
+    ...(isPanelAdmin ? [{ to: "/resellers", label: "Revendedores", icon: Users }] : []),
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
