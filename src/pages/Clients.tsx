@@ -8,29 +8,31 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ITEMS_PER_PAGE = 20;
 
 const Clients = () => {
   const { data: clients, isLoading } = useClients();
   const { roles } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
-  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers } = useResellers(isPanelAdmin ? tenantId : undefined);
   
   const [search, setSearch] = useState("");
   const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     if (!clients) return [];
     let result = clients;
     
-    // Filter by reseller (panel admin only)
     if (isPanelAdmin && resellerFilter !== "all") {
       result = result.filter((c) => c.reseller_id === resellerFilter);
     }
@@ -38,12 +40,25 @@ const Clients = () => {
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
-        (c) => c.name.toLowerCase().includes(q) || c.phone?.includes(q) || c.plan.toLowerCase().includes(q)
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.phone?.includes(q) ||
+          (c.plan || "").toLowerCase().includes(q) ||
+          (c.servidor || "").toLowerCase().includes(q) ||
+          (c.aplicativo || "").toLowerCase().includes(q) ||
+          (c.captacao || "").toLowerCase().includes(q)
       );
     }
     return result;
   }, [clients, search, resellerFilter, isPanelAdmin]);
 
+  // Reset page on filter change
+  useMemo(() => { setPage(1); }, [search, resellerFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const title = isReseller ? "Meus Clientes" : "Clientes";
 
   return (
@@ -65,7 +80,7 @@ const Clients = () => {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, telefone ou plano..."
+            placeholder="Buscar por nome, telefone, plano, servidor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -104,14 +119,14 @@ const Clients = () => {
                   Carregando...
                 </TableCell>
               </TableRow>
-            ) : filtered.length === 0 ? (
+            ) : paged.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   Nenhum cliente encontrado
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((client) => {
+              paged.map((client) => {
                 const status = getStatusFromDate(client.expiration_date);
                 return (
                   <TableRow
@@ -121,7 +136,7 @@ const Clients = () => {
                   >
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell className="text-muted-foreground">{client.phone || "-"}</TableCell>
-                    <TableCell>{client.plan}</TableCell>
+                    <TableCell>{client.plan || "-"}</TableCell>
                     <TableCell className="font-mono text-sm">
                       {format(new Date(client.expiration_date + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
@@ -135,6 +150,20 @@ const Clients = () => {
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-3 text-sm text-muted-foreground">
+          <span>{filtered.length} registros • Página {page} de {totalPages}</span>
+          <div className="flex gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ClientDetailDialog
         client={selectedClient}

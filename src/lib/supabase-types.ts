@@ -6,12 +6,18 @@ export interface Client {
   reseller_id: string | null;
   name: string;
   phone: string | null;
-  plan: string;
+  plan: string | null;
   expiration_date: string;
   notes: string | null;
-  is_suspended: boolean;
+  is_suspended: boolean | null;
   created_at: string;
   updated_at: string;
+  valor: number | null;
+  servidor: string | null;
+  telas: number | null;
+  aplicativo: string | null;
+  dispositivo: string | null;
+  captacao: string | null;
 }
 
 export interface Tenant {

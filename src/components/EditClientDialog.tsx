@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Client } from "@/lib/supabase-types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/lib/audit";
@@ -12,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 
 interface EditClientDialogProps {
-  client: any | null;
+  client: Client | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
