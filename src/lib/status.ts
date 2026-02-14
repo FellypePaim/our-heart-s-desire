@@ -51,7 +51,7 @@ const STATUS_MAP: Record<StatusKey, Omit<StatusConfig, "key">> = {
     colorClass: "text-status-pre2",
     bgClass: "bg-status-pre2-bg",
     borderClass: "border-status-pre2/30",
-    templateKey: null,
+    templateKey: "pre2_reminder",
   },
   pre1: {
     label: "Vence amanhã",
@@ -87,7 +87,7 @@ const STATUS_MAP: Record<StatusKey, Omit<StatusConfig, "key">> = {
     colorClass: "text-status-post2",
     bgClass: "bg-status-post2-bg",
     borderClass: "border-status-post2/30",
-    templateKey: null,
+    templateKey: "post2_charge",
   },
   expired: {
     label: "Vencido",
