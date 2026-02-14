@@ -38,6 +38,7 @@ export function AddClientDialog() {
   const { data: servers } = useServiceOptions("server");
   const { data: apps } = useServiceOptions("app");
   const { data: devices } = useServiceOptions("device");
+  const { data: captacoes } = useServiceOptions("captacao");
 
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
@@ -150,7 +151,7 @@ export function AddClientDialog() {
               <Label htmlFor="plan">Plano</Label>
               <Select value={plan} onValueChange={handlePlanChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o plano" />
                 </SelectTrigger>
                 <SelectContent>
                   {plans?.map(p => (
@@ -171,7 +172,7 @@ export function AddClientDialog() {
               <Label htmlFor="servidor">Servidor</Label>
               <Select value={servidor} onValueChange={setServidor}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o servidor" />
                 </SelectTrigger>
                 <SelectContent>
                   {servers?.map(s => (
@@ -188,7 +189,7 @@ export function AddClientDialog() {
               <Label htmlFor="aplicativo">Aplicativo</Label>
               <Select value={aplicativo} onValueChange={setAplicativo}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o aplicativo" />
                 </SelectTrigger>
                 <SelectContent>
                   {apps?.map(a => (
@@ -201,7 +202,7 @@ export function AddClientDialog() {
               <Label htmlFor="dispositivo">Dispositivo</Label>
               <Select value={dispositivo} onValueChange={setDispositivo}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o dispositivo" />
                 </SelectTrigger>
                 <SelectContent>
                   {devices?.map(d => (
@@ -212,7 +213,16 @@ export function AddClientDialog() {
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="captacao">Captação</Label>
-              <Input id="captacao" value={captacao} onChange={(e) => setCaptacao(e.target.value)} placeholder="Ex: Divulgação, Indicação" />
+              <Select value={captacao} onValueChange={setCaptacao}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a captação" />
+                </SelectTrigger>
+                <SelectContent>
+                  {captacoes?.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="notes">Observações</Label>

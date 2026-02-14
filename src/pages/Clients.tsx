@@ -20,6 +20,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +45,7 @@ const Clients = () => {
   const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [messageClient, setMessageClient] = useState<Client | null>(null);
   const [page, setPage] = useState(1);
 
   // Delete state
@@ -92,11 +94,10 @@ const Clients = () => {
 
   const title = isReseller ? "Meus Clientes" : "Clientes";
 
-  const handleSendMessage = (e: React.MouseEvent, phone?: string | null) => {
+  const handleSendMessage = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation();
-    if (!phone) return;
-    const cleanPhone = phone.replace(/\D/g, "");
-    window.open(`https://wa.me/${cleanPhone}`, "_blank");
+    if (!client.phone) return;
+    setMessageClient(client);
   };
 
   const handleRenewClient = async (e: React.MouseEvent, client: Client) => {
@@ -279,7 +280,7 @@ const Clients = () => {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleRenewClient(e, client)} title="Renovar (+1 mês)">
                           <RefreshCw className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleSendMessage(e, client.phone)} disabled={!client.phone} title="WhatsApp">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleSendMessage(e, client)} disabled={!client.phone} title="WhatsApp">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleToggleSuspend(e, client)} title={client.is_suspended ? "Desbloquear" : "Bloquear"}>
@@ -322,6 +323,12 @@ const Clients = () => {
         client={editingClient}
         open={!!editingClient}
         onOpenChange={(open) => !open && setEditingClient(null)}
+      />
+
+      <WhatsAppMessageDialog
+        client={messageClient}
+        open={!!messageClient}
+        onOpenChange={(open) => !open && setMessageClient(null)}
       />
 
       {/* Delete Confirmation */}

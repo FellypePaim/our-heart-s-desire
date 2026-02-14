@@ -35,6 +35,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
   const { data: servers } = useServiceOptions("server");
   const { data: apps } = useServiceOptions("app");
   const { data: devices } = useServiceOptions("device");
+  const { data: captacoes } = useServiceOptions("captacao");
 
   useEffect(() => {
     if (client) {
@@ -130,7 +131,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Label>Plano</Label>
               <Select value={form.plan} onValueChange={handlePlanChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o plano" />
                 </SelectTrigger>
                 <SelectContent>
                   {plans?.map(p => (
@@ -151,7 +152,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Label>Servidor</Label>
               <Select value={form.servidor} onValueChange={(v) => handleChange("servidor", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o servidor" />
                 </SelectTrigger>
                 <SelectContent>
                   {servers?.map(s => (
@@ -168,7 +169,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Label>Aplicativo</Label>
               <Select value={form.aplicativo} onValueChange={(v) => handleChange("aplicativo", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o aplicativo" />
                 </SelectTrigger>
                 <SelectContent>
                   {apps?.map(a => (
@@ -181,7 +182,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Label>Dispositivo</Label>
               <Select value={form.dispositivo} onValueChange={(v) => handleChange("dispositivo", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o dispositivo" />
                 </SelectTrigger>
                 <SelectContent>
                   {devices?.map(d => (
@@ -192,7 +193,16 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
             </div>
             <div className="space-y-2 col-span-2">
               <Label>Captação</Label>
-              <Input value={form.captacao} onChange={(e) => handleChange("captacao", e.target.value)} placeholder="Ex: Divulgação, Indicação" />
+              <Select value={form.captacao} onValueChange={(v) => handleChange("captacao", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a captação" />
+                </SelectTrigger>
+                <SelectContent>
+                  {captacoes?.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label>Observações</Label>
