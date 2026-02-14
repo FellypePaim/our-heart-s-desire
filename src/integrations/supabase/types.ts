@@ -49,7 +49,10 @@ export type Database = {
       }
       clients: {
         Row: {
+          aplicativo: string | null
+          captacao: string | null
           created_at: string
+          dispositivo: string | null
           expiration_date: string
           id: string
           is_suspended: boolean | null
@@ -58,12 +61,18 @@ export type Database = {
           phone: string | null
           plan: string | null
           reseller_id: string | null
+          servidor: string | null
+          telas: number | null
           tenant_id: string | null
           updated_at: string
           user_id: string
+          valor: number | null
         }
         Insert: {
+          aplicativo?: string | null
+          captacao?: string | null
           created_at?: string
+          dispositivo?: string | null
           expiration_date: string
           id?: string
           is_suspended?: boolean | null
@@ -72,12 +81,18 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           reseller_id?: string | null
+          servidor?: string | null
+          telas?: number | null
           tenant_id?: string | null
           updated_at?: string
           user_id: string
+          valor?: number | null
         }
         Update: {
+          aplicativo?: string | null
+          captacao?: string | null
           created_at?: string
+          dispositivo?: string | null
           expiration_date?: string
           id?: string
           is_suspended?: boolean | null
@@ -86,9 +101,12 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           reseller_id?: string | null
+          servidor?: string | null
+          telas?: number | null
           tenant_id?: string | null
           updated_at?: string
           user_id?: string
+          valor?: number | null
         }
         Relationships: [
           {

@@ -1,0 +1,8 @@
+
+ALTER TABLE public.clients
+ADD COLUMN IF NOT EXISTS valor numeric DEFAULT 0,
+ADD COLUMN IF NOT EXISTS servidor text DEFAULT '',
+ADD COLUMN IF NOT EXISTS telas integer DEFAULT 1,
+ADD COLUMN IF NOT EXISTS aplicativo text DEFAULT '',
+ADD COLUMN IF NOT EXISTS dispositivo text DEFAULT '',
+ADD COLUMN IF NOT EXISTS captacao text DEFAULT '';
