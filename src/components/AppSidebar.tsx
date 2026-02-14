@@ -29,7 +29,7 @@ export function AppSidebar() {
   const superAdminItems = [
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/tenants", label: "Painéis", icon: Building2 },
-    { to: "/admin/users", label: "Usuários", icon: Shield },
+    { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
     { to: "/admin/settings", label: "Config. Globais", icon: Settings },
     { to: "/admin/audit", label: "Auditoria", icon: Crown },
   ];
