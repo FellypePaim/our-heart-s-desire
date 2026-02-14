@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { validateWhatsAppPhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,8 @@ const Resellers = () => {
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newPhoneError, setNewPhoneError] = useState("");
   const [newMaxClients, setNewMaxClients] = useState(50);
   const [saving, setSaving] = useState(false);
 
@@ -326,6 +329,23 @@ const Resellers = () => {
             <div className="space-y-2">
               <Label>Senha *</Label>
               <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp *</Label>
+              <Input
+                value={newPhone}
+                onChange={(e) => {
+                  setNewPhone(e.target.value);
+                  if (e.target.value.trim()) {
+                    const { valid, error } = validateWhatsAppPhone(e.target.value);
+                    setNewPhoneError(valid ? "" : error || "");
+                  } else {
+                    setNewPhoneError("");
+                  }
+                }}
+                placeholder="(DD) 9XXXX-XXXX"
+              />
+              {newPhoneError && <p className="text-xs text-destructive">{newPhoneError}</p>}
             </div>
             <div className="space-y-2">
               <Label>Máx. Clientes</Label>

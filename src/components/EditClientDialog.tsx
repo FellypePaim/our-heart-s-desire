@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Client } from "@/lib/supabase-types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServiceOptions } from "@/hooks/useServiceOptions";
+import { validateWhatsAppPhone } from "@/lib/phone";
 import { Save } from "lucide-react";
 
 interface EditClientDialogProps {
@@ -20,38 +23,29 @@ interface EditClientDialogProps {
 
 export function EditClientDialog({ client, open, onOpenChange }: EditClientDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
   const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    plan: "",
-    expiration_date: "",
-    notes: "",
-    valor: "",
-    servidor: "",
-    telas: "1",
-    aplicativo: "",
-    dispositivo: "",
-    captacao: "",
+    name: "", phone: "", plan: "", expiration_date: "", notes: "",
+    valor: "", servidor: "", telas: "1", aplicativo: "", dispositivo: "", captacao: "",
   });
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: plans } = useServiceOptions("plan");
+  const { data: servers } = useServiceOptions("server");
+  const { data: apps } = useServiceOptions("app");
+  const { data: devices } = useServiceOptions("device");
 
   useEffect(() => {
     if (client) {
       setForm({
-        name: client.name || "",
-        phone: client.phone || "",
-        plan: client.plan || "",
-        expiration_date: client.expiration_date || "",
-        notes: client.notes || "",
-        valor: client.valor ? String(client.valor) : "",
-        servidor: client.servidor || "",
-        telas: client.telas ? String(client.telas) : "1",
-        aplicativo: client.aplicativo || "",
-        dispositivo: client.dispositivo || "",
-        captacao: client.captacao || "",
+        name: client.name || "", phone: client.phone || "", plan: client.plan || "",
+        expiration_date: client.expiration_date || "", notes: client.notes || "",
+        valor: client.valor ? String(client.valor) : "", servidor: client.servidor || "",
+        telas: client.telas ? String(client.telas) : "1", aplicativo: client.aplicativo || "",
+        dispositivo: client.dispositivo || "", captacao: client.captacao || "",
       });
+      setPhoneError("");
     }
   }, [client]);
 
@@ -59,31 +53,46 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handlePhoneChange = (value: string) => {
+    handleChange("phone", value);
+    if (value.trim()) {
+      const { valid, error } = validateWhatsAppPhone(value);
+      setPhoneError(valid ? "" : error || "");
+    } else {
+      setPhoneError("");
+    }
+  };
+
+  const handlePlanChange = (planName: string) => {
+    handleChange("plan", planName);
+    const planOpt = plans?.find(p => p.name === planName);
+    if (planOpt?.config) {
+      if (planOpt.config.price) handleChange("valor", String(planOpt.config.price));
+      if (planOpt.config.screens) handleChange("telas", String(planOpt.config.screens));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !client) return;
-    setLoading(true);
 
+    if (form.phone.trim()) {
+      const { valid, error } = validateWhatsAppPhone(form.phone);
+      if (!valid) { setPhoneError(error || "Número inválido"); return; }
+    }
+
+    setLoading(true);
     try {
+      const cleanedPhone = form.phone.trim() ? validateWhatsAppPhone(form.phone).cleaned : null;
       const updateData: any = {
-        name: form.name,
-        phone: form.phone || null,
-        plan: form.plan,
-        expiration_date: form.expiration_date,
-        notes: form.notes || null,
-        valor: form.valor ? Number(form.valor) : 0,
-        servidor: form.servidor || "",
-        telas: form.telas ? Number(form.telas) : 1,
-        aplicativo: form.aplicativo || "",
-        dispositivo: form.dispositivo || "",
-        captacao: form.captacao || "",
+        name: form.name, phone: cleanedPhone, plan: form.plan,
+        expiration_date: form.expiration_date, notes: form.notes || null,
+        valor: form.valor ? Number(form.valor) : 0, servidor: form.servidor || "",
+        telas: form.telas ? Number(form.telas) : 1, aplicativo: form.aplicativo || "",
+        dispositivo: form.dispositivo || "", captacao: form.captacao || "",
       };
 
-      const { error } = await supabase
-        .from("clients")
-        .update(updateData)
-        .eq("id", client.id);
-
+      const { error } = await supabase.from("clients").update(updateData).eq("id", client.id);
       if (error) throw error;
 
       await logAudit(user.id, "client_updated", "client", client.id, { changes: updateData });
@@ -112,13 +121,23 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Label>Nome *</Label>
               <Input value={form.name} onChange={(e) => handleChange("name", e.target.value)} required />
             </div>
-            <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="(00) 00000-0000" />
+            <div className="space-y-2 col-span-2">
+              <Label>WhatsApp</Label>
+              <Input value={form.phone} onChange={(e) => handlePhoneChange(e.target.value)} placeholder="(DD) 9XXXX-XXXX" />
+              {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
             </div>
             <div className="space-y-2">
               <Label>Plano</Label>
-              <Input value={form.plan} onChange={(e) => handleChange("plan", e.target.value)} placeholder="Mensal, Trimestral..." />
+              <Select value={form.plan} onValueChange={handlePlanChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans?.map(p => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Vencimento *</Label>
@@ -130,7 +149,16 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
             </div>
             <div className="space-y-2">
               <Label>Servidor</Label>
-              <Input value={form.servidor} onChange={(e) => handleChange("servidor", e.target.value)} placeholder="Ex: BRAVE" />
+              <Select value={form.servidor} onValueChange={(v) => handleChange("servidor", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {servers?.map(s => (
+                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Telas</Label>
@@ -138,11 +166,29 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
             </div>
             <div className="space-y-2">
               <Label>Aplicativo</Label>
-              <Input value={form.aplicativo} onChange={(e) => handleChange("aplicativo", e.target.value)} placeholder="Ex: XCIPTV" />
+              <Select value={form.aplicativo} onValueChange={(v) => handleChange("aplicativo", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {apps?.map(a => (
+                    <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Dispositivo</Label>
-              <Input value={form.dispositivo} onChange={(e) => handleChange("dispositivo", e.target.value)} placeholder="Ex: Smart TV" />
+              <Select value={form.dispositivo} onValueChange={(v) => handleChange("dispositivo", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices?.map(d => (
+                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label>Captação</Label>
@@ -153,7 +199,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
               <Textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} placeholder="Notas adicionais..." />
             </div>
           </div>
-          <Button type="submit" className="w-full gap-2" disabled={loading}>
+          <Button type="submit" className="w-full gap-2" disabled={loading || !!phoneError}>
             <Save className="h-4 w-4" />
             {loading ? "Salvando..." : "Salvar Alterações"}
           </Button>

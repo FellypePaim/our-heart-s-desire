@@ -18,6 +18,7 @@ import AdminTenants from "./pages/admin/AdminTenants";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAudit from "./pages/admin/AdminAudit";
+import ServiceConfig from "./pages/ServiceConfig";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ function ProtectedLayout() {
             <Route path="/clients" element={<Clients />} />
             <Route path="/resellers" element={<Resellers />} />
             <Route path="/messages" element={<Messages />} />
+            <Route path="/service-config" element={<ServiceConfig />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/tenants" element={<AdminTenants />} />
