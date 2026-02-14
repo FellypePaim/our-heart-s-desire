@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
 import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { getStatusFromDate } from "@/lib/status";
 import { Client } from "@/lib/supabase-types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -13,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff } from "lucide-react";
 
 const ITEMS_PER_PAGE = 20;
 
 const Clients = () => {
   const { data: clients, isLoading } = useClients();
   const { roles } = useAuth();
+  const { hidden, toggle, mask } = usePrivacyMode();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers } = useResellers(isPanelAdmin ? tenantId : undefined);
@@ -32,11 +34,9 @@ const Clients = () => {
   const filtered = useMemo(() => {
     if (!clients) return [];
     let result = clients;
-    
     if (isPanelAdmin && resellerFilter !== "all") {
       result = result.filter((c) => c.reseller_id === resellerFilter);
     }
-    
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -52,7 +52,6 @@ const Clients = () => {
     return result;
   }, [clients, search, resellerFilter, isPanelAdmin]);
 
-  // Reset page on filter change
   useMemo(() => { setPage(1); }, [search, resellerFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -80,7 +79,18 @@ const Clients = () => {
             {clients?.length || 0} clientes cadastrados
           </p>
         </div>
-        <AddClientDialog />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggle}
+            title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
+            className="h-9 w-9"
+          >
+            {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+          <AddClientDialog />
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -123,34 +133,24 @@ const Clients = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Carregando...
-                </TableCell>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhum cliente encontrado
-                </TableCell>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
               </TableRow>
             ) : (
               paged.map((client) => {
                 const status = getStatusFromDate(client.expiration_date);
                 return (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedClient(client)}
-                  >
+                  <TableRow key={client.id} className="cursor-pointer" onClick={() => setSelectedClient(client)}>
                     <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{client.phone || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">{mask(client.phone, "phone")}</TableCell>
                     <TableCell>{client.plan || "-"}</TableCell>
                     <TableCell className="font-mono text-sm">
                       {format(new Date(client.expiration_date + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
-                    <TableCell>
-                      <StatusBadge status={status} size="sm" />
-                    </TableCell>
+                    <TableCell><StatusBadge status={status} size="sm" /></TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"

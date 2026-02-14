@@ -11,10 +11,12 @@ import { cn } from "@/lib/utils";
 interface ClientCardProps {
   client: Client;
   onClick?: () => void;
+  maskPhone?: (value: string | null | undefined, type: "phone") => string;
 }
 
-export function ClientCard({ client, onClick }: ClientCardProps) {
+export function ClientCard({ client, onClick, maskPhone }: ClientCardProps) {
   const status = getStatusFromDate(client.expiration_date);
+  const displayPhone = maskPhone ? maskPhone(client.phone, "phone") : (client.phone || "");
 
   const handleSendMessage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,7 +45,7 @@ export function ClientCard({ client, onClick }: ClientCardProps) {
               {client.phone && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Phone className="h-3 w-3" />
-                  {client.phone}
+                  {displayPhone}
                 </p>
               )}
             </div>
@@ -56,7 +58,7 @@ export function ClientCard({ client, onClick }: ClientCardProps) {
               onClick={handleSendMessage}
               title="Enviar mensagem via WhatsApp"
             >
-              <MessageSquare className="h-3.5 w-3.5 text-green-600" />
+              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
           )}
         </div>

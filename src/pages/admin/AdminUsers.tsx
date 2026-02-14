@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useAllUserRoles, useTenants, useAllClients } from "@/hooks/useSuperAdmin";
 import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Shield, Search, Ban, CheckCircle, Eye, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, Filter, X } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, Pencil, RefreshCw, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, Filter, X } from "lucide-react";
 import { getAllStatuses, type StatusKey } from "@/lib/status";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -90,6 +91,7 @@ const AdminUsers = () => {
   const { data: allClients, isLoading: clientsLoading } = useAllClients();
   const { data: allResellers, isLoading: resellersLoading } = useResellers();
   const [search, setSearch] = useState("");
+  const { hidden, toggle: togglePrivacy, mask } = usePrivacyMode();
   const [filterRole, setFilterRole] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("all");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -405,6 +407,15 @@ const AdminUsers = () => {
                 </SelectContent>
               </Select>
             )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={togglePrivacy}
+              title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
+              className="h-9 w-9"
+            >
+              {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
             <Button variant="outline" size="sm" onClick={exportCurrentTab} className="gap-2">
               <Download className="h-4 w-4" /> Exportar CSV
             </Button>
@@ -482,7 +493,7 @@ const AdminUsers = () => {
                 ) : (
                   pagedRoles.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{r.user_id}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{hidden ? "••••••••" : r.user_id}</TableCell>
                       <TableCell>
                         <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                           {roleLabels[r.role] || r.role}
@@ -554,13 +565,13 @@ const AdminUsers = () => {
                     return (
                       <TableRow key={client.id}>
                         <TableCell className="font-medium">{client.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{client.phone || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{mask(client.phone, "phone")}</TableCell>
                         <TableCell className="font-mono text-sm">
                           {format(new Date(client.expiration_date + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR })}
                         </TableCell>
                         <TableCell>{client.plan}</TableCell>
                         <TableCell className="font-mono text-sm">
-                          {client.valor ? `R$ ${Number(client.valor).toFixed(2).replace(".", ",")}` : "-"}
+                          {hidden ? "R$ •••" : (client.valor ? `R$ ${Number(client.valor).toFixed(2).replace(".", ",")}` : "-")}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={status} size="sm" />
@@ -658,7 +669,7 @@ const AdminUsers = () => {
                 ) : (
                   pagedMasters.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{r.user_id}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px] truncate">{hidden ? "••••••••" : r.user_id}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id.slice(0, 8) : "-"}
                       </TableCell>
