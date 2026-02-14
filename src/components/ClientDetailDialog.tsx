@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { RefreshCw, Trash2, Pause, Play, Calendar, Phone, Package, Pencil, Monitor, Tv, Server, Users, DollarSign } from "lucide-react";
+import { RefreshCw, Trash2, Pause, Play, Calendar, Phone, Package, Pencil, Monitor, Tv, Server, Users, DollarSign, MessageSquare } from "lucide-react";
 
 interface ClientDetailDialogProps {
   client: Client | null;
@@ -158,6 +158,22 @@ export function ClientDetailDialog({ client, open, onOpenChange }: ClientDetailD
                 <Pencil className="h-4 w-4" />
                 Editar
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!client.phone) return;
+                  const cleanPhone = client.phone.replace(/\D/g, "");
+                  window.open(`https://wa.me/${cleanPhone}`, "_blank");
+                }}
+                disabled={!client.phone}
+                className="flex-1 gap-1.5 text-green-600 hover:text-green-700"
+                title="Enviar mensagem via WhatsApp"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Mensagem
+              </Button>
+            </div>
+            <div className="flex gap-2">
               <Button variant="outline" onClick={handleToggleSuspend} disabled={loading} className="flex-1 gap-1.5">
                 {client.is_suspended ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                 {client.is_suspended ? "Reativar" : "Suspender"}

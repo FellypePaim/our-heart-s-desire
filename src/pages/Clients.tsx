@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -60,6 +60,13 @@ const Clients = () => {
 
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const title = isReseller ? "Meus Clientes" : "Clientes";
+
+  const handleSendMessage = (e: React.MouseEvent, phone?: string | null) => {
+    e.stopPropagation();
+    if (!phone) return;
+    const cleanPhone = phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${cleanPhone}`, "_blank");
+  };
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -110,18 +117,19 @@ const Clients = () => {
               <TableHead>Plano</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Nenhum cliente encontrado
                 </TableCell>
               </TableRow>
@@ -142,6 +150,18 @@ const Clients = () => {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={status} size="sm" />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => handleSendMessage(e, client.phone)}
+                        disabled={!client.phone}
+                        title="Enviar mensagem via WhatsApp"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
