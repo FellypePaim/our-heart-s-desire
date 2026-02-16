@@ -71,13 +71,15 @@ const ServiceConfig = () => {
   const handleSave = async () => {
     if (!formName.trim()) return;
     try {
+      const isEditingGlobalAsNonAdmin = editing && editing.is_global && !isSuperAdmin;
       await upsert.mutateAsync({
-        id: editing?.id,
+        // If non-admin editing a global option, create a new local copy instead
+        id: isEditingGlobalAsNonAdmin ? undefined : editing?.id,
         category: tab,
         name: formName.trim(),
         config: formConfig,
-        created_by: editing?.created_by || (isSuperAdmin ? null : user?.id || null),
-        is_global: editing?.is_global ?? isSuperAdmin,
+        created_by: isSuperAdmin ? (editing?.created_by ?? null) : user?.id || null,
+        is_global: isSuperAdmin ? (editing?.is_global ?? true) : false,
       });
       toast({ title: editing ? "Atualizado!" : "Criado!", description: `${formName} salvo com sucesso.` });
       setEditOpen(false);
@@ -106,10 +108,9 @@ const ServiceConfig = () => {
     return [];
   };
 
-  const canEdit = (opt: ServiceOption) => {
+  const canEdit = (_opt: ServiceOption) => {
     if (isSuperAdmin) return true;
-    if (opt.is_global) return false;
-    return isOwnOption(opt);
+    return isPanelAdmin || isReseller;
   };
 
   return (
