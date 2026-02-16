@@ -34,7 +34,7 @@ const actionLabels: Record<string, string> = {
   user_unblocked: "Usuário desbloqueado",
   user_role_deleted: "Cargo removido",
   role_changed: "Cargo alterado",
-  impersonate_start: "Impersonate iniciado",
+  
 };
 
 const AdminAudit = () => {

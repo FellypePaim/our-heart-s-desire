@@ -22,23 +22,6 @@ import ServiceConfig from "./pages/ServiceConfig";
 
 const queryClient = new QueryClient();
 
-function ImpersonateBanner() {
-  const { impersonating, setImpersonating } = useAuth();
-  if (!impersonating) return null;
-
-  return (
-    <div className="bg-status-today text-white px-4 py-2 text-sm font-medium flex items-center justify-between z-50 relative">
-      <span>⚠️ Você está em modo suporte (SuperAdmin). Visualizando como outro usuário.</span>
-      <button
-        onClick={() => setImpersonating(null)}
-        className="underline text-xs hover:text-white/80"
-      >
-        Encerrar
-      </button>
-    </div>
-  );
-}
-
 function ProtectedLayout() {
   const { session, loading } = useAuth();
 
@@ -54,7 +37,6 @@ function ProtectedLayout() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <ImpersonateBanner />
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar />
         <main className="flex-1 overflow-hidden flex flex-col">

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export function AppSidebar() {
-  const { signOut, user, isSuperAdmin, impersonating, roles } = useAuth();
+  const { signOut, user, isSuperAdmin, roles } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -103,12 +103,6 @@ export function AppSidebar() {
         </button>
       </div>
 
-      {impersonating && (
-        <div className="mx-3 mt-3 rounded-lg border border-status-today/30 bg-status-today-bg p-2.5 text-xs">
-          <p className="font-semibold text-status-today">⚠️ Modo Suporte</p>
-          <p className="text-status-today/80 mt-0.5">Você está em modo suporte (SuperAdmin).</p>
-        </div>
-      )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {/* Menu SuperAdmin - apenas para superadmins */}
