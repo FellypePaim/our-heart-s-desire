@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { validateWhatsAppPhone } from "@/lib/phone";
+import { useTenants } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ const Resellers = () => {
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
+  const { data: tenants } = useTenants();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [page, setPage] = useState(1);
@@ -46,6 +48,7 @@ const Resellers = () => {
   const [newPhone, setNewPhone] = useState("");
   const [newPhoneError, setNewPhoneError] = useState("");
   const [newMaxClients, setNewMaxClients] = useState(50);
+  const [newTenantId, setNewTenantId] = useState<string>(tenantId || "");
   const [saving, setSaving] = useState(false);
 
   // Edit state
@@ -101,7 +104,8 @@ const Resellers = () => {
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const handleCreate = async () => {
-    if (!newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || !user) return;
+    const effectiveTenant = isSuperAdmin ? newTenantId : tenantId;
+    if (!newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || !user || !effectiveTenant) return;
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-user", {
@@ -110,7 +114,7 @@ const Resellers = () => {
           password: newPassword,
           name: newDisplayName.trim(),
           role: "reseller",
-          tenant_id: tenantId,
+          tenant_id: effectiveTenant,
         },
       });
       if (error) throw error;
@@ -138,6 +142,7 @@ const Resellers = () => {
       setNewEmail("");
       setNewPassword("");
       setNewMaxClients(50);
+      setNewTenantId(tenantId || "");
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -368,10 +373,25 @@ const Resellers = () => {
               <Label>Máx. Clientes</Label>
               <Input type="number" value={newMaxClients} onChange={(e) => setNewMaxClients(Number(e.target.value))} />
             </div>
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <Label>Painel (Tenant) *</Label>
+                <Select value={newTenantId} onValueChange={setNewTenantId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o painel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants?.filter((t) => t.status === "active").map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={saving || !newDisplayName.trim() || !newEmail.trim() || !newPassword.trim()}>
+            <Button onClick={handleCreate} disabled={saving || !newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || (isSuperAdmin && !newTenantId)}>
               {saving ? "Criando..." : "Criar Revendedor"}
             </Button>
           </DialogFooter>
