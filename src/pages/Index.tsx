@@ -11,6 +11,7 @@ import { ClientMetrics } from "@/components/radar/ClientMetrics";
 import { ResellerMetrics } from "@/components/radar/ResellerMetrics";
 import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
+import { OperationalLimits } from "@/components/OperationalLimits";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
@@ -108,6 +109,9 @@ const Index = () => {
 
         <TabsContent value="clients" className="flex-1 overflow-hidden flex flex-col mt-0">
           <ClientMetrics clients={clients || []} isLoading={isLoading} mask={hidden ? mask : undefined} />
+          <div className="px-4 md:px-6 pt-2">
+            <OperationalLimits />
+          </div>
 
           {/* Kanban Board */}
           <div className="flex-1 overflow-x-auto p-4 md:p-6">
