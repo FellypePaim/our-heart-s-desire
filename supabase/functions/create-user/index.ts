@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
         owner_user_id: newUser.user.id,
         display_name: name || email.split("@")[0],
         limits: { max_clients: 50, max_messages_month: 500 },
+        created_by: caller.id,
       });
     }
 
