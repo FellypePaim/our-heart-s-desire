@@ -121,7 +121,7 @@ const ServiceConfig = () => {
             Servidores & Planos
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Configure planos, servidores, aplicativos e dispositivos
+            Configure planos, servidores, aplicativos, dispositivos e captação
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
