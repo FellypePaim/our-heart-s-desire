@@ -23,6 +23,7 @@ import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, P
 import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
 import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
 import { BulkRenewDialog } from "@/components/BulkRenewDialog";
+import { CSVImportExport } from "@/components/CSVImportExport";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -185,7 +186,8 @@ const Clients = () => {
             {filtered.length} de {clients?.length || 0} clientes
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <CSVImportExport clients={filtered} />
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkRenewOpen(true)}>
             <CalendarDays className="h-4 w-4" />
             Renovar em Lote
