@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyReseller } from "@/hooks/useResellers";
+import { useMyReseller, useResellers } from "@/hooks/useResellers";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Users, AlertTriangle } from "lucide-react";
 
@@ -12,6 +14,24 @@ export function OperationalLimits() {
 
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
+
+  // Fetch profile limits for Master
+  const { data: profile } = useQuery({
+    queryKey: ["profile_limits", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("limits")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && isPanelAdmin,
+  });
+
+  // Fetch reseller count for Master
+  const { data: resellers } = useResellers();
 
   const limits = useMemo(() => {
     if (!clients) return null;
@@ -25,27 +45,29 @@ export function OperationalLimits() {
         label: "Revendedor",
         items: [
           { name: "Clientes", current: currentClients, max: maxClients },
-          { name: "Mensagens/mês", current: 0, max: maxMessages }, // TODO: count from message_logs
+          { name: "Mensagens/mês", current: 0, max: maxMessages },
         ],
       };
     }
 
     if (isPanelAdmin) {
-      // Master: count own direct clients (no reseller_id)
+      const profileLimits = (profile?.limits as any) || {};
+      const maxClients = profileLimits.max_clients ?? 200;
+      const maxResellers = profileLimits.max_resellers ?? 10;
       const directClients = clients.filter((c) => c.user_id === user?.id).length;
-      // For masters we use a default limit of 200, could be configurable later
-      const maxClients = 200;
+      const resellerCount = resellers?.length || 0;
 
       return {
         label: "Master",
         items: [
           { name: "Clientes diretos", current: directClients, max: maxClients },
+          { name: "Revendedores", current: resellerCount, max: maxResellers },
         ],
       };
     }
 
     return null;
-  }, [clients, myReseller, isReseller, isPanelAdmin, user?.id]);
+  }, [clients, myReseller, isReseller, isPanelAdmin, user?.id, profile, resellers]);
 
   if (!limits) return null;
 
@@ -72,10 +94,7 @@ export function OperationalLimits() {
                   {item.current} / {item.max}
                 </span>
               </div>
-              <Progress
-                value={pct}
-                className="h-2"
-              />
+              <Progress value={pct} className="h-2" />
               {isAtLimit && (
                 <p className="text-xs text-destructive">Limite atingido! Contate o administrador para aumentar.</p>
               )}

@@ -19,7 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2, Plus } from "lucide-react";
+import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2, Plus, SlidersHorizontal } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -105,6 +105,13 @@ const AdminUsers = () => {
   const [newPhoneError, setNewPhoneError] = useState("");
   const [newRole, setNewRole] = useState<string>("user");
   const [creating, setCreating] = useState(false);
+
+  // Limits modal state
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const [limitsUserId, setLimitsUserId] = useState<string | null>(null);
+  const [limitsMaxClients, setLimitsMaxClients] = useState(200);
+  const [limitsMaxResellers, setLimitsMaxResellers] = useState(10);
+  const [limitsSaving, setLimitsSaving] = useState(false);
 
   const allSort = useSort();
 
@@ -237,6 +244,59 @@ const AdminUsers = () => {
     }
   };
 
+  const openLimitsModal = async (userId: string) => {
+    setLimitsUserId(userId);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("limits")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const l = (data?.limits as any) || {};
+      setLimitsMaxClients(l.max_clients ?? 200);
+      setLimitsMaxResellers(l.max_resellers ?? 10);
+    } catch {
+      setLimitsMaxClients(200);
+      setLimitsMaxResellers(10);
+    }
+    setLimitsOpen(true);
+  };
+
+  const handleSaveLimits = async () => {
+    if (!limitsUserId || !user) return;
+    setLimitsSaving(true);
+    try {
+      const newLimits = { max_clients: limitsMaxClients, max_resellers: limitsMaxResellers };
+      // Upsert profile with limits
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", limitsUserId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ limits: newLimits as any })
+          .eq("user_id", limitsUserId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("profiles")
+          .insert({ user_id: limitsUserId, limits: newLimits as any });
+        if (error) throw error;
+      }
+
+      await logAudit(user.id, "limits_updated", "user", limitsUserId, newLimits);
+      toast({ title: "Limites atualizados!", description: `Máx. clientes: ${limitsMaxClients}, Máx. revendedores: ${limitsMaxResellers}` });
+      setLimitsOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setLimitsSaving(false);
+    }
+  };
+
   const handleCreateUser = async () => {
     if (!newEmail.trim() || !newPassword.trim() || !newRole) return;
     setCreating(true);
@@ -350,6 +410,11 @@ const AdminUsers = () => {
                             <Button variant="ghost" size="icon" onClick={() => openRoleModal(r.user_id, r.role, r.id)} title="Alterar cargo">
                               <UserCog className="h-4 w-4" />
                             </Button>
+                            {r.role === "panel_admin" && (
+                              <Button variant="ghost" size="icon" onClick={() => openLimitsModal(r.user_id)} title="Configurar limites">
+                                <SlidersHorizontal className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" onClick={() => handleToggleActive(r.id, r.is_active, r.user_id)} title={r.is_active ? "Bloquear" : "Desbloquear"}>
                               {r.is_active ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                             </Button>
@@ -489,6 +554,39 @@ const AdminUsers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Limits Modal */}
+      <Dialog open={limitsOpen} onOpenChange={setLimitsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SlidersHorizontal className="h-5 w-5" />
+              Limites do Master
+            </DialogTitle>
+            <DialogDescription>
+              {limitsUserId && `Definir limites para ${getUserName(limitsUserId)}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Máx. Clientes Diretos</Label>
+              <Input type="number" min={1} value={limitsMaxClients} onChange={(e) => setLimitsMaxClients(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground">Quantidade máxima de clientes que este Master pode cadastrar diretamente.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Máx. Revendedores</Label>
+              <Input type="number" min={0} value={limitsMaxResellers} onChange={(e) => setLimitsMaxResellers(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground">Quantidade máxima de revendedores que este Master pode criar.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLimitsOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveLimits} disabled={limitsSaving}>
+              {limitsSaving ? "Salvando..." : "Salvar Limites"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
