@@ -71,16 +71,29 @@ const ServiceConfig = () => {
   const handleSave = async () => {
     if (!formName.trim()) return;
     try {
-      const isEditingGlobalAsNonAdmin = editing && editing.is_global && !isSuperAdmin;
-      await upsert.mutateAsync({
-        // If non-admin editing a global option, create a new local copy instead
-        id: isEditingGlobalAsNonAdmin ? undefined : editing?.id,
-        category: tab,
-        name: formName.trim(),
-        config: formConfig,
-        created_by: isSuperAdmin ? (editing?.created_by ?? null) : user?.id || null,
-        is_global: isSuperAdmin ? (editing?.is_global ?? true) : false,
-      });
+      const isNonAdmin = !isSuperAdmin;
+      const isEditingGlobal = editing && editing.is_global && isNonAdmin;
+
+      if (isEditingGlobal) {
+        // Create a local copy (new record) instead of modifying global
+        await upsert.mutateAsync({
+          id: undefined,
+          category: tab,
+          name: formName.trim(),
+          config: formConfig,
+          created_by: user?.id || null,
+          is_global: false,
+        });
+      } else {
+        await upsert.mutateAsync({
+          id: editing?.id,
+          category: tab,
+          name: formName.trim(),
+          config: formConfig,
+          created_by: editing?.created_by ?? (isSuperAdmin ? null : user?.id || null),
+          is_global: editing?.is_global ?? isSuperAdmin,
+        });
+      }
       toast({ title: editing ? "Atualizado!" : "Criado!", description: `${formName} salvo com sucesso.` });
       setEditOpen(false);
     } catch (e: any) {
