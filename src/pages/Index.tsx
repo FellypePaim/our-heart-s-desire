@@ -46,7 +46,7 @@ const Index = () => {
           <div>
             <h1 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
               <Radar className="h-5 w-5 md:h-6 md:w-6 text-status-today" />
-              Radar Operacional
+              Dashboard
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               Antecipe riscos antes que os problemas ocorram

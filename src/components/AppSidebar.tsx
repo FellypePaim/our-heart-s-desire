@@ -20,7 +20,7 @@ export function AppSidebar() {
 
   // Menu do Revendedor - acesso básico
   const resellerItems = [
-    { to: "/", label: "Radar", icon: LayoutDashboard },
+    { to: "/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/clients", label: "Meus Clientes", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
     { to: "/service-config", label: "Servidores & Planos", icon: Server },
@@ -29,7 +29,7 @@ export function AppSidebar() {
 
   // Menu do Master - acesso ao menu de Master + Revendedor
   const masterItems = [
-    { to: "/", label: "Radar", icon: LayoutDashboard },
+    { to: "/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/clients", label: "Clientes", icon: Users },
     { to: "/resellers", label: "Revendedores", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },

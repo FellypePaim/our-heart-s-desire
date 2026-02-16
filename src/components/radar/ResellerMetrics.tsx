@@ -1,7 +1,12 @@
+import { useMemo } from "react";
 import { useResellers } from "@/hooks/useResellers";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
 import { Users, UserCheck, UserX, BarChart3, DollarSign, TrendingUp } from "lucide-react";
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
+} from "recharts";
 
 interface ResellerMetricsProps {
   mask?: (value: string | null | undefined, type: "phone" | "value" | "email" | "text") => string;
@@ -12,6 +17,37 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
   const { data: clients } = useClients();
+
+  const chartData = useMemo(() => {
+    if (!resellers || resellers.length === 0) return { clientDist: [], revenueDist: [], statusDist: [] };
+
+    const resellerIds = resellers.map((r) => r.id);
+    const resellerClients = clients?.filter((c) => c.reseller_id && resellerIds.includes(c.reseller_id)) || [];
+
+    const clientDist = resellers.map((r) => ({
+      name: r.display_name.length > 12 ? r.display_name.slice(0, 12) + "…" : r.display_name,
+      clientes: r.client_count || 0,
+      receita: resellerClients.filter((c) => c.reseller_id === r.id).reduce((s, c) => s + (c.valor || 0), 0),
+    })).sort((a, b) => b.clientes - a.clientes);
+
+    const active = resellers.filter((r) => r.status === "active").length;
+    const suspended = resellers.filter((r) => r.status === "suspended").length;
+    const statusDist = [
+      { name: "Ativos", value: active, color: "hsl(142, 60%, 40%)" },
+      { name: "Suspensos", value: suspended, color: "hsl(0, 70%, 45%)" },
+    ].filter((d) => d.value > 0);
+
+    const revenueDist = resellers.map((r) => {
+      const rev = resellerClients.filter((c) => c.reseller_id === r.id).reduce((s, c) => s + (c.valor || 0), 0);
+      return {
+        name: r.display_name.length > 12 ? r.display_name.slice(0, 12) + "…" : r.display_name,
+        value: rev,
+        color: r.status === "active" ? "hsl(142, 60%, 40%)" : "hsl(0, 70%, 45%)",
+      };
+    }).filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
+
+    return { clientDist, revenueDist, statusDist };
+  }, [resellers, clients]);
 
   if (isLoading) {
     return (
@@ -27,7 +63,6 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
   const totalClients = resellers?.reduce((sum, r) => sum + (r.client_count || 0), 0) || 0;
   const avgClients = total > 0 ? Math.round(totalClients / total) : 0;
 
-  // Aggregate revenue from clients linked to resellers
   const resellerIds = resellers?.map((r) => r.id) || [];
   const resellerClients = clients?.filter((c) => c.reseller_id && resellerIds.includes(c.reseller_id)) || [];
   const totalResellerRevenue = resellerClients.reduce((sum, c) => sum + (c.valor || 0), 0);
@@ -48,8 +83,11 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
     { label: "Receita Média/Revendedor", value: fmt(avgRevenuePerReseller), icon: TrendingUp, color: "text-status-active" },
   ];
 
+  const PIE_COLORS = ["hsl(220, 70%, 50%)", "hsl(142, 60%, 40%)", "hsl(45, 80%, 48%)", "hsl(280, 60%, 50%)", "hsl(15, 95%, 50%)", "hsl(190, 70%, 45%)", "hsl(0, 70%, 45%)", "hsl(320, 60%, 50%)"];
+
   return (
     <div className="space-y-6 p-4 md:p-6 overflow-auto">
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-lg border bg-card p-4 space-y-1">
@@ -60,6 +98,89 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
             <p className="text-lg md:text-xl font-bold font-mono">{kpi.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Status Distribution Pie */}
+        <div className="rounded-lg border bg-card p-4">
+          <h3 className="text-sm font-semibold mb-4">Status dos Revendedores</h3>
+          {chartData.statusDist.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={chartData.statusDist}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={90}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
+                  {chartData.statusDist.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => [v, "Revendedores"]} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
+          )}
+        </div>
+
+        {/* Revenue per Reseller Pie */}
+        <div className="rounded-lg border bg-card p-4">
+          <h3 className="text-sm font-semibold mb-4">Receita por Revendedor</h3>
+          {chartData.revenueDist.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={chartData.revenueDist}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${fmt(value)}`}
+                >
+                  {chartData.revenueDist.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => [fmt(v), "Receita"]} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
+          )}
+        </div>
+
+        {/* Clients per Reseller Bar */}
+        <div className="rounded-lg border bg-card p-4 lg:col-span-2">
+          <h3 className="text-sm font-semibold mb-4">Clientes e Receita por Revendedor</h3>
+          {chartData.clientDist.length > 0 ? (
+            <ResponsiveContainer width="100%" height={Math.max(200, chartData.clientDist.length * 50)}>
+              <BarChart data={chartData.clientDist} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 88%)" />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(v: number, name: string) => [
+                    name === "receita" ? fmt(v) : v,
+                    name === "receita" ? "Receita" : "Clientes",
+                  ]}
+                />
+                <Legend />
+                <Bar dataKey="clientes" fill="hsl(220, 70%, 50%)" name="Clientes" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="receita" fill="hsl(142, 60%, 40%)" name="Receita (R$)" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
+          )}
+        </div>
       </div>
 
       {/* Reseller Table */}
