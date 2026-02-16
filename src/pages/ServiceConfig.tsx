@@ -14,7 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Server, Plus, Pencil, Trash2 } from "lucide-react";
+import { Server, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 
 const categoryLabels: Record<string, string> = {
   plan: "Planos", server: "Servidores", app: "Aplicativos",
@@ -75,7 +75,9 @@ const ServiceConfig = () => {
       const isEditingGlobal = editing && editing.is_global && isNonAdmin;
 
       if (isEditingGlobal) {
-        // Create a local copy (new record) instead of modifying global
+        // Non-admin editing a global option: update existing local copy or create one
+        // The deduplication already hides the global when a local exists,
+        // so if we're editing a "global" item, no local copy exists yet — create one
         await upsert.mutateAsync({
           id: undefined,
           category: tab,
@@ -85,6 +87,7 @@ const ServiceConfig = () => {
           is_global: false,
         });
       } else {
+        // Editing own record or super_admin editing anything
         await upsert.mutateAsync({
           id: editing?.id,
           category: tab,
@@ -96,6 +99,16 @@ const ServiceConfig = () => {
       }
       toast({ title: editing ? "Atualizado!" : "Criado!", description: `${formName} salvo com sucesso.` });
       setEditOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleRestoreGlobal = async (opt: ServiceOption) => {
+    if (!opt.created_by || opt.is_global) return;
+    try {
+      await deleteOpt.mutateAsync(opt.id);
+      toast({ title: "Restaurado!", description: `${opt.name} voltou para a configuração global.` });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
@@ -187,7 +200,12 @@ const ServiceConfig = () => {
                             {canEdit(opt) && (
                               <>
                                 <Button variant="ghost" size="icon" onClick={() => openEdit(opt)} title="Editar"><Pencil className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => { setDeletingId(opt.id); setDeleteOpen(true); }} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                {!opt.is_global && isOwnOption(opt) && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleRestoreGlobal(opt)} title="Restaurar padrão global"><RotateCcw className="h-4 w-4 text-muted-foreground" /></Button>
+                                )}
+                                {(isSuperAdmin || isOwnOption(opt)) && (
+                                  <Button variant="ghost" size="icon" onClick={() => { setDeletingId(opt.id); setDeleteOpen(true); }} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                )}
                               </>
                             )}
                           </div>

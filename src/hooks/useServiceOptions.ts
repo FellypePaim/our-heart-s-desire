@@ -48,7 +48,7 @@ export function useServiceOptions(category?: string) {
 export function useAllServiceOptions() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["service_options_all"],
+    queryKey: ["service_options_all", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("service_options")
@@ -56,7 +56,7 @@ export function useAllServiceOptions() {
         .order("category")
         .order("name");
       if (error) throw error;
-      return (data || []) as ServiceOption[];
+      return deduplicateOptions((data || []) as ServiceOption[], user?.id);
     },
     enabled: !!user,
   });
