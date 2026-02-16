@@ -9,9 +9,11 @@ import { ClientDetailDialog } from "@/components/ClientDetailDialog";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { ClientMetrics } from "@/components/radar/ClientMetrics";
 import { ResellerMetrics } from "@/components/radar/ResellerMetrics";
+import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
+import { RevenueForecast } from "@/components/radar/RevenueForecast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Radar, Eye, EyeOff, Users, Store } from "lucide-react";
+import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
 
 const Index = () => {
   const { data: clients, isLoading } = useClients();
@@ -78,6 +80,20 @@ const Index = () => {
               <Users className="h-4 w-4" />
               Cliente Final
             </TabsTrigger>
+            <TabsTrigger
+              value="churn"
+              className="relative h-10 rounded-none border-b-2 border-transparent px-1 pb-3 pt-2 font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Churn & Retenção
+            </TabsTrigger>
+            <TabsTrigger
+              value="forecast"
+              className="relative h-10 rounded-none border-b-2 border-transparent px-1 pb-3 pt-2 font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Previsão de Receita
+            </TabsTrigger>
             {showResellerTab && (
               <TabsTrigger
                 value="resellers"
@@ -116,6 +132,14 @@ const Index = () => {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="churn" className="flex-1 overflow-auto mt-0 p-4 md:p-6">
+          <ChurnRetentionChart clients={clients || []} />
+        </TabsContent>
+
+        <TabsContent value="forecast" className="flex-1 overflow-auto mt-0 p-4 md:p-6">
+          <RevenueForecast clients={clients || []} mask={hidden ? mask : undefined} />
         </TabsContent>
 
         {showResellerTab && (
