@@ -29,6 +29,7 @@ export function AddClientDialog() {
   const [aplicativo, setAplicativo] = useState("");
   const [dispositivo, setDispositivo] = useState("");
   const [captacao, setCaptacao] = useState("");
+  const [formaPagamento, setFormaPagamento] = useState("");
   const { user, roles } = useAuth();
   const { data: myReseller } = useMyReseller();
   const { toast } = useToast();
@@ -39,6 +40,7 @@ export function AddClientDialog() {
   const { data: apps } = useServiceOptions("app");
   const { data: devices } = useServiceOptions("device");
   const { data: captacoes } = useServiceOptions("captacao");
+  const { data: pagamentos } = useServiceOptions("pagamento");
 
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
@@ -46,7 +48,7 @@ export function AddClientDialog() {
   const resetForm = () => {
     setName(""); setPhone(""); setPhoneError(""); setPlan(""); setExpirationDate("");
     setNotes(""); setValor(""); setServidor(""); setTelas("1"); setAplicativo("");
-    setDispositivo(""); setCaptacao("");
+    setDispositivo(""); setCaptacao(""); setFormaPagamento("");
   };
 
   const handlePhoneChange = (value: string) => {
@@ -98,6 +100,7 @@ export function AddClientDialog() {
         aplicativo: aplicativo || "",
         dispositivo: dispositivo || "",
         captacao: captacao || "",
+        forma_pagamento: formaPagamento || "",
       };
 
       if (tenantId) insertData.tenant_id = tenantId;
@@ -207,6 +210,19 @@ export function AddClientDialog() {
                 <SelectContent>
                   {devices?.map(d => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="formaPagamento">Forma de Pagamento</Label>
+              <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a forma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pagamentos?.map(p => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

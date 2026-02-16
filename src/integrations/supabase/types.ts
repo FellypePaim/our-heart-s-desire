@@ -54,6 +54,7 @@ export type Database = {
           created_at: string
           dispositivo: string | null
           expiration_date: string
+          forma_pagamento: string | null
           id: string
           is_suspended: boolean | null
           name: string
@@ -74,6 +75,7 @@ export type Database = {
           created_at?: string
           dispositivo?: string | null
           expiration_date: string
+          forma_pagamento?: string | null
           id?: string
           is_suspended?: boolean | null
           name: string
@@ -94,6 +96,7 @@ export type Database = {
           created_at?: string
           dispositivo?: string | null
           expiration_date?: string
+          forma_pagamento?: string | null
           id?: string
           is_suspended?: boolean | null
           name?: string

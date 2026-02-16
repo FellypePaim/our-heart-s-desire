@@ -26,7 +26,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
   const [phoneError, setPhoneError] = useState("");
   const [form, setForm] = useState({
     name: "", phone: "", plan: "", expiration_date: "", notes: "",
-    valor: "", servidor: "", telas: "1", aplicativo: "", dispositivo: "", captacao: "",
+    valor: "", servidor: "", telas: "1", aplicativo: "", dispositivo: "", captacao: "", forma_pagamento: "",
   });
   const { user } = useAuth();
   const { toast } = useToast();
@@ -36,6 +36,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
   const { data: apps } = useServiceOptions("app");
   const { data: devices } = useServiceOptions("device");
   const { data: captacoes } = useServiceOptions("captacao");
+  const { data: pagamentos } = useServiceOptions("pagamento");
 
   useEffect(() => {
     if (client) {
@@ -44,7 +45,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
         expiration_date: client.expiration_date || "", notes: client.notes || "",
         valor: client.valor ? String(client.valor) : "", servidor: client.servidor || "",
         telas: client.telas ? String(client.telas) : "1", aplicativo: client.aplicativo || "",
-        dispositivo: client.dispositivo || "", captacao: client.captacao || "",
+        dispositivo: client.dispositivo || "", captacao: client.captacao || "", forma_pagamento: (client as any).forma_pagamento || "",
       });
       setPhoneError("");
     }
@@ -90,7 +91,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
         expiration_date: form.expiration_date, notes: form.notes || null,
         valor: form.valor ? Number(form.valor) : 0, servidor: form.servidor || "",
         telas: form.telas ? Number(form.telas) : 1, aplicativo: form.aplicativo || "",
-        dispositivo: form.dispositivo || "", captacao: form.captacao || "",
+        dispositivo: form.dispositivo || "", captacao: form.captacao || "", forma_pagamento: form.forma_pagamento || "",
       };
 
       const { error } = await supabase.from("clients").update(updateData).eq("id", client.id);
@@ -187,6 +188,19 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
                 <SelectContent>
                   {devices?.map(d => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Forma de Pagamento</Label>
+              <Select value={form.forma_pagamento} onValueChange={(v) => handleChange("forma_pagamento", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a forma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pagamentos?.map(p => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

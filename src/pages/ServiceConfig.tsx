@@ -21,6 +21,7 @@ const categoryLabels: Record<string, string> = {
   server: "Servidores",
   app: "Aplicativos",
   device: "Dispositivos",
+  pagamento: "Formas de Pagamento",
   captacao: "Captação",
 };
 
@@ -60,7 +61,7 @@ const ServiceConfig = () => {
   const openCreate = () => {
     setEditing(null);
     setFormName("");
-    setFormConfig(tab === "plan" ? { price: 0, credits: 1, screens: 1, duration_months: 1 } : tab === "server" ? { cost_per_credit: 0 } : tab === "captacao" ? {} : {});
+    setFormConfig(tab === "plan" ? { price: 0, credits: 1, screens: 1, duration_months: 1 } : tab === "server" ? { cost_per_credit: 0 } : {});
     setEditOpen(true);
   };
 
@@ -121,7 +122,7 @@ const ServiceConfig = () => {
             Servidores & Planos
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Configure planos, servidores, aplicativos, dispositivos e captação
+            Configure planos, servidores, aplicativos, dispositivos, formas de pagamento e captação
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
@@ -135,10 +136,11 @@ const ServiceConfig = () => {
           <TabsTrigger value="server">Servidores</TabsTrigger>
           <TabsTrigger value="app">Aplicativos</TabsTrigger>
           <TabsTrigger value="device">Dispositivos</TabsTrigger>
+          <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
           <TabsTrigger value="captacao">Captação</TabsTrigger>
         </TabsList>
 
-        {["plan", "server", "app", "device", "captacao"].map((cat) => (
+        {["plan", "server", "app", "device", "pagamento", "captacao"].map((cat) => (
           <TabsContent key={cat} value={cat}>
             <div className="rounded-lg border bg-card overflow-x-auto">
               <Table>

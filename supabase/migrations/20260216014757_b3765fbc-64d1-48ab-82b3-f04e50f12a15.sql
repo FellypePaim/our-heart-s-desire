@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN forma_pagamento text NULL DEFAULT '';
