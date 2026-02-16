@@ -50,6 +50,7 @@ const Resellers = () => {
   const [editingReseller, setEditingReseller] = useState<Reseller | null>(null);
   const [editName, setEditName] = useState("");
   const [editMaxClients, setEditMaxClients] = useState(50);
+  const [editMaxMessages, setEditMaxMessages] = useState(500);
   const [editSaving, setEditSaving] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -156,6 +157,7 @@ const Resellers = () => {
     setEditingReseller(reseller);
     setEditName(reseller.display_name);
     setEditMaxClients(reseller.limits?.max_clients || 50);
+    setEditMaxMessages(reseller.limits?.max_messages_month || 500);
     setEditOpen(true);
   };
 
@@ -167,7 +169,7 @@ const Resellers = () => {
         .from("resellers")
         .update({
           display_name: editName.trim(),
-          limits: { ...editingReseller.limits, max_clients: editMaxClients },
+          limits: { ...editingReseller.limits, max_clients: editMaxClients, max_messages_month: editMaxMessages },
         })
         .eq("id", editingReseller.id);
       if (error) throw error;
@@ -271,7 +273,7 @@ const Resellers = () => {
                   </TableCell>
                   <TableCell className="font-mono">{r.client_count || 0}</TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground font-mono">
-                    {r.limits?.max_clients || "∞"} clientes
+                    {r.limits?.max_clients || "∞"} clientes / {r.limits?.max_messages_month || "∞"} msg
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                     {getOwnerName(r.owner_user_id)}
@@ -382,6 +384,10 @@ const Resellers = () => {
             <div className="space-y-2">
               <Label>Máx. Clientes</Label>
               <Input type="number" value={editMaxClients} onChange={(e) => setEditMaxClients(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Máx. Mensagens/mês</Label>
+              <Input type="number" value={editMaxMessages} onChange={(e) => setEditMaxMessages(Number(e.target.value))} />
             </div>
           </div>
           <DialogFooter>
