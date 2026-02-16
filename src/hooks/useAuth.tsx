@@ -6,7 +6,6 @@ export type AppRole = "super_admin" | "panel_admin" | "reseller" | "user";
 
 interface UserRole {
   role: AppRole;
-  tenant_id: string | null;
   is_active: boolean;
 }
 
@@ -16,7 +15,6 @@ interface AuthContextType {
   loading: boolean;
   roles: UserRole[];
   isSuperAdmin: boolean;
-  currentTenantId: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -26,7 +24,6 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   roles: [],
   isSuperAdmin: false,
-  currentTenantId: null,
   signOut: async () => {},
 });
 
@@ -34,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
-  
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -59,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchRoles = async () => {
       const { data, error } = await supabase
         .from("user_roles")
-        .select("role, tenant_id, is_active")
+        .select("role, is_active")
         .eq("user_id", session.user.id);
 
       if (!error && data) {
@@ -76,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
-  const currentTenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id ?? null;
 
   return (
     <AuthContext.Provider
@@ -86,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         roles,
         isSuperAdmin,
-        currentTenantId,
         signOut,
       }}
     >

@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut, Radar,
-  Crown, Building2, Shield, Globe, Moon, Sun, Menu, X, Server
+  Crown, Shield, Globe, Moon, Sun, Menu, X, Server
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -18,7 +18,6 @@ export function AppSidebar() {
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
 
-  // Menu do Revendedor - acesso básico
   const resellerItems = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/clients", label: "Meus Clientes", icon: Users },
@@ -27,7 +26,6 @@ export function AppSidebar() {
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
-  // Menu do Master - acesso ao menu de Master + Revendedor
   const masterItems = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/clients", label: "Clientes", icon: Users },
@@ -37,18 +35,15 @@ export function AppSidebar() {
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
-  // Menu do SuperAdmin - acesso completo
   const superAdminItems = [
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
     { to: "/admin/audit", label: "Log de Atividades", icon: Crown },
   ];
 
-  // Determina quais itens do painel exibir baseado no cargo
   const getPanelItems = () => {
     if (isReseller) return resellerItems;
     if (isPanelAdmin) return masterItems;
-    // Para superadmin ou user genérico, mostra menu completo do master
     return masterItems;
   };
 
@@ -102,9 +97,7 @@ export function AppSidebar() {
         </button>
       </div>
 
-
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {/* Menu SuperAdmin - apenas para superadmins */}
         {isSuperAdmin && (
           <>
             <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
@@ -115,9 +108,8 @@ export function AppSidebar() {
           </>
         )}
 
-        {/* Menu do Painel - baseado no cargo */}
         <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-          {isReseller ? "Revendedor" : isPanelAdmin ? "Master" : "Painel"}
+          {isReseller ? "Revendedor" : isPanelAdmin ? "Master" : "Menu"}
         </p>
         {panelItems.map(renderNavItem)}
       </nav>
@@ -148,7 +140,6 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(true)}
         className="fixed top-4 left-4 z-50 lg:hidden flex h-10 w-10 items-center justify-center rounded-lg border bg-card shadow-md"
@@ -156,7 +147,6 @@ export function AppSidebar() {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -164,7 +154,6 @@ export function AppSidebar() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground shrink-0 transition-transform z-50",

@@ -7,11 +7,10 @@ import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { validateWhatsAppPhone } from "@/lib/phone";
-import { useTenants } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -33,14 +32,11 @@ const Resellers = () => {
   const { user, roles, loading } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
-  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
-  const { data: resellers, isLoading } = useResellers(tenantId);
-  const { data: tenants } = useTenants();
+  const { data: resellers, isLoading } = useResellers();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [page, setPage] = useState(1);
 
-  // Create reseller via edge function state
   const [createOpen, setCreateOpen] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -48,29 +44,24 @@ const Resellers = () => {
   const [newPhone, setNewPhone] = useState("");
   const [newPhoneError, setNewPhoneError] = useState("");
   const [newMaxClients, setNewMaxClients] = useState(50);
-  const [newTenantId, setNewTenantId] = useState<string>(tenantId || "");
   const [saving, setSaving] = useState(false);
 
-  // Edit state
   const [editOpen, setEditOpen] = useState(false);
   const [editingReseller, setEditingReseller] = useState<Reseller | null>(null);
   const [editName, setEditName] = useState("");
   const [editMaxClients, setEditMaxClients] = useState(50);
   const [editSaving, setEditSaving] = useState(false);
 
-  // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingReseller, setDeletingReseller] = useState<Reseller | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // User profiles for #Criador column
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch user profiles for creator names (only for superadmin or panel admin)
   useEffect(() => {
     if (!isSuperAdmin) return;
     const fetchProfiles = async () => {
@@ -86,7 +77,6 @@ const Resellers = () => {
   }, [isSuperAdmin]);
 
   const getOwnerName = (ownerUserId: string) => {
-    // For panel admin, if it's their own user, show "Eu"
     if (ownerUserId === user?.id) return "Eu";
     const p = profileMap.get(ownerUserId);
     return p?.name || p?.email?.split("@")[0] || ownerUserId.slice(0, 8);
@@ -104,8 +94,7 @@ const Resellers = () => {
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const handleCreate = async () => {
-    const effectiveTenant = isSuperAdmin ? newTenantId : tenantId;
-    if (!newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || !user || !effectiveTenant) return;
+    if (!newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || !user) return;
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-user", {
@@ -114,13 +103,11 @@ const Resellers = () => {
           password: newPassword,
           name: newDisplayName.trim(),
           role: "reseller",
-          tenant_id: effectiveTenant,
         },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Update reseller limits if different from default
       if (newMaxClients !== 50 && data?.user_id) {
         await supabase.from("resellers")
           .update({ limits: { max_clients: newMaxClients, max_messages_month: 500 } })
@@ -128,11 +115,10 @@ const Resellers = () => {
       }
 
       await logAudit(user.id, "reseller_created", "reseller", undefined, { 
-        display_name: newDisplayName, email: newEmail, tenant_id: tenantId 
+        display_name: newDisplayName, email: newEmail 
       });
       toast({ title: "Revendedor criado!", description: `${newDisplayName} (${newEmail}) foi cadastrado com acesso.` });
       queryClient.invalidateQueries({ queryKey: ["resellers"] });
-      // Refresh profiles
       if (isSuperAdmin) {
         const { data: profilesData } = await supabase.functions.invoke("get-user-profiles");
         if (profilesData) setProfiles(profilesData);
@@ -142,7 +128,6 @@ const Resellers = () => {
       setNewEmail("");
       setNewPassword("");
       setNewMaxClients(50);
-      setNewTenantId(tenantId || "");
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -353,7 +338,7 @@ const Resellers = () => {
               <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
             </div>
             <div className="space-y-2">
-              <Label>WhatsApp *</Label>
+              <Label>WhatsApp</Label>
               <Input
                 value={newPhone}
                 onChange={(e) => {
@@ -373,25 +358,10 @@ const Resellers = () => {
               <Label>Máx. Clientes</Label>
               <Input type="number" value={newMaxClients} onChange={(e) => setNewMaxClients(Number(e.target.value))} />
             </div>
-            {isSuperAdmin && (
-              <div className="space-y-2">
-                <Label>Painel (Tenant) *</Label>
-                <Select value={newTenantId} onValueChange={setNewTenantId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o painel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants?.filter((t) => t.status === "active").map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={saving || !newDisplayName.trim() || !newEmail.trim() || !newPassword.trim() || (isSuperAdmin && !newTenantId)}>
+            <Button onClick={handleCreate} disabled={saving || !newDisplayName.trim() || !newEmail.trim() || !newPassword.trim()}>
               {saving ? "Criando..." : "Criar Revendedor"}
             </Button>
           </DialogFooter>
@@ -413,10 +383,13 @@ const Resellers = () => {
               <Label>Máx. Clientes</Label>
               <Input type="number" value={editMaxClients} onChange={(e) => setEditMaxClients(Number(e.target.value))} />
             </div>
-            <Button onClick={handleEdit} disabled={editSaving || !editName.trim()} className="w-full">
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleEdit} disabled={editSaving || !editName.trim()}>
               {editSaving ? "Salvando..." : "Salvar"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -426,7 +399,7 @@ const Resellers = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir revendedor</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir <strong>{deletingReseller?.display_name}</strong>? Clientes vinculados podem ficar sem revendedor.
+              Tem certeza que deseja excluir <strong>{deletingReseller?.display_name}</strong>? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

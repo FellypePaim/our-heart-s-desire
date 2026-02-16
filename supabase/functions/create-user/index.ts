@@ -32,13 +32,12 @@ Deno.serve(async (req) => {
     // Check caller role
     const { data: callerRoles } = await adminClient
       .from("user_roles")
-      .select("role, tenant_id, is_active")
+      .select("role, is_active")
       .eq("user_id", caller.id)
       .eq("is_active", true);
 
     const isSuperAdmin = callerRoles?.some((r: any) => r.role === "super_admin");
     const isPanelAdmin = callerRoles?.some((r: any) => r.role === "panel_admin");
-    const callerTenantId = callerRoles?.find((r: any) => r.tenant_id)?.tenant_id;
 
     if (!isSuperAdmin && !isPanelAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -47,7 +46,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, password, name, role, tenant_id } = body;
+    const { email, password, name, role } = body;
 
     if (!email || !password || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields: email, password, role" }), {
@@ -64,21 +63,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Panel admin can only create resellers in their own tenant
-    if (isPanelAdmin && !isSuperAdmin) {
-      if (role !== "reseller") {
-        return new Response(JSON.stringify({ error: "Panel admin can only create reseller accounts" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const effectiveTenantId = isSuperAdmin ? (tenant_id || null) : callerTenantId;
-
-    // Resellers MUST have a tenant
-    if (role === "reseller" && !effectiveTenantId) {
-      return new Response(JSON.stringify({ error: "Reseller must be assigned to a tenant/panel" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Panel admin can only create resellers
+    if (isPanelAdmin && !isSuperAdmin && role !== "reseller") {
+      return new Response(JSON.stringify({ error: "Panel admin can only create reseller accounts" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -100,7 +88,6 @@ Deno.serve(async (req) => {
     const { error: roleError } = await adminClient.from("user_roles").insert({
       user_id: newUser.user.id,
       role,
-      tenant_id: effectiveTenantId,
       is_active: true,
     });
 
@@ -111,9 +98,8 @@ Deno.serve(async (req) => {
     }
 
     // If creating a reseller, also create the reseller record
-    if (role === "reseller" && effectiveTenantId) {
+    if (role === "reseller") {
       await adminClient.from("resellers").insert({
-        tenant_id: effectiveTenantId,
         owner_user_id: newUser.user.id,
         display_name: name || email.split("@")[0],
         limits: { max_clients: 50, max_messages_month: 500 },

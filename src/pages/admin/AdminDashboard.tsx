@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { useGlobalStats, useAllClients, useAllUserRoles, useTenants } from "@/hooks/useSuperAdmin";
+import { useGlobalStats, useAllClients, useAllUserRoles } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getStatusFromDate, getAllStatuses } from "@/lib/status";
 import {
-  Globe, Building2, Users, UserCheck, AlertTriangle, TrendingDown,
+  Globe, Users, UserCheck, AlertTriangle, TrendingDown,
   DollarSign, BarChart3, Crown, Store, TrendingUp, Clock
 } from "lucide-react";
 import {
@@ -49,10 +49,8 @@ const AdminDashboard = () => {
   const { data: stats, isLoading } = useGlobalStats();
   const { data: allClients } = useAllClients();
   const { data: allRoles } = useAllUserRoles();
-  const { data: tenants } = useTenants();
   const { data: allResellers } = useAllResellers();
 
-  // Role counts
   const roleCounts = useMemo(() => {
     if (!allRoles) return { masters: 0, resellers: 0, users: 0 };
     const masters = allRoles.filter((r) => r.role === "panel_admin" && r.is_active).length;
@@ -61,7 +59,6 @@ const AdminDashboard = () => {
     return { masters, resellers, users };
   }, [allRoles]);
 
-  // Financial metrics
   const financials = useMemo(() => {
     if (!allClients) return { totalRevenue: 0, avgTicket: 0, activeRevenue: 0, overdueRevenue: 0, todayRevenue: 0 };
     const today = new Date();
@@ -74,18 +71,15 @@ const AdminDashboard = () => {
     return { totalRevenue, avgTicket, activeRevenue, overdueRevenue, todayRevenue };
   }, [allClients]);
 
-  // Reseller stats
   const resellerStats = useMemo(() => {
     if (!allResellers) return { total: 0, active: 0, suspended: 0, totalResClients: 0 };
-    const active = allResellers.filter((r) => r.status === "active").length;
-    const suspended = allResellers.filter((r) => r.status === "suspended").length;
-    // Count clients per reseller
-    const resIds = allResellers.map((r) => r.id);
+    const active = allResellers.filter((r: any) => r.status === "active").length;
+    const suspended = allResellers.filter((r: any) => r.status === "suspended").length;
+    const resIds = allResellers.map((r: any) => r.id);
     const totalResClients = allClients?.filter((c) => c.reseller_id && resIds.includes(c.reseller_id)).length || 0;
     return { total: allResellers.length, active, suspended, totalResClients };
   }, [allResellers, allClients]);
 
-  // Status distribution
   const statusDistribution = useMemo(() => {
     if (!allClients) return [];
     const counts: Record<string, number> = {};
@@ -99,7 +93,6 @@ const AdminDashboard = () => {
       .filter((d) => d.value > 0);
   }, [allClients]);
 
-  // Server distribution
   const serverDistribution = useMemo(() => {
     if (!allClients) return [];
     const counts: Record<string, { clientes: number; receita: number }> = {};
@@ -115,7 +108,6 @@ const AdminDashboard = () => {
       .slice(0, 10);
   }, [allClients]);
 
-  // Payment methods
   const paymentDistribution = useMemo(() => {
     if (!allClients) return [];
     const counts: Record<string, number> = {};
@@ -128,23 +120,6 @@ const AdminDashboard = () => {
       .sort((a, b) => b.value - a.value);
   }, [allClients]);
 
-  // Clients per tenant
-  const tenantDistribution = useMemo(() => {
-    if (!allClients || !tenants) return [];
-    const counts: Record<string, { clientes: number; receita: number }> = {};
-    allClients.forEach((c) => {
-      const tid = c.tenant_id || "Sem painel";
-      if (!counts[tid]) counts[tid] = { clientes: 0, receita: 0 };
-      counts[tid].clientes++;
-      counts[tid].receita += c.valor || 0;
-    });
-    const tenantMap = new Map(tenants.map((t) => [t.id, t.name]));
-    return Object.entries(counts)
-      .map(([tid, data]) => ({ name: tenantMap.get(tid) || tid.slice(0, 8), ...data }))
-      .sort((a, b) => b.clientes - a.clientes);
-  }, [allClients, tenants]);
-
-  // Role distribution pie
   const roleDistribution = useMemo(() => {
     return [
       { name: "Masters", value: roleCounts.masters, color: "hsl(280, 60%, 50%)" },
@@ -158,7 +133,6 @@ const AdminDashboard = () => {
   const fmt = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
   const statCards = [
-    { label: "Painéis Ativos", value: stats?.activeTenants ?? 0, total: stats?.totalTenants, icon: Building2, color: "text-status-active" },
     { label: "Masters", value: roleCounts.masters, icon: Crown, color: "text-purple-600" },
     { label: "Revendedores", value: resellerStats.total, sub: `${resellerStats.active} ativos`, icon: Store, color: "text-blue-600" },
     { label: "Clientes Finais", value: stats?.totalClients ?? 0, icon: Users, color: "text-foreground" },
@@ -180,11 +154,10 @@ const AdminDashboard = () => {
           Dashboard Global
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Visão consolidada de todos os painéis, masters, revendedores e clientes
+          Visão consolidada de todos os masters, revendedores e clientes
         </p>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {statCards.map((s) => (
           <Card key={s.label}>
@@ -196,9 +169,6 @@ const AdminDashboard = () => {
               <p className="text-xl font-bold font-mono">
                 {isLoading ? "..." : s.value}
               </p>
-              {s.total !== undefined && (
-                <p className="text-xs text-muted-foreground">de {s.total} total</p>
-              )}
               {(s as any).sub && (
                 <p className="text-xs text-muted-foreground">{(s as any).sub}</p>
               )}
@@ -207,79 +177,41 @@ const AdminDashboard = () => {
         ))}
       </div>
 
-      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Distribution */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Distribuição por Status</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Distribuição por Status</CardTitle></CardHeader>
           <CardContent>
             {statusDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
-                  <Pie
-                    data={statusDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {statusDistribution.map((entry) => (
-                      <Cell key={entry.key} fill={STATUS_COLORS[entry.key] || "#888"} />
-                    ))}
+                  <Pie data={statusDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} label={({ name, value }) => `${name}: ${value}`}>
+                    {statusDistribution.map((entry) => (<Cell key={entry.key} fill={STATUS_COLORS[entry.key] || "#888"} />))}
                   </Pie>
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-            )}
+            ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
           </CardContent>
         </Card>
 
-        {/* Role Distribution */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Distribuição por Cargo</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Distribuição por Cargo</CardTitle></CardHeader>
           <CardContent>
             {roleDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
-                  <Pie
-                    data={roleDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={3}
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {roleDistribution.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                  <Pie data={roleDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`}>
+                    {roleDistribution.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
                   </Pie>
                   <Tooltip formatter={(v: number) => [v, "Usuários"]} />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-            )}
+            ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
           </CardContent>
         </Card>
 
-        {/* Server Distribution */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Clientes por Servidor</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Clientes por Servidor</CardTitle></CardHeader>
           <CardContent>
             {serverDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
@@ -287,89 +219,34 @@ const AdminDashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 88%)" />
                   <XAxis type="number" />
                   <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={(v: number, name: string) => [
-                      name === "receita" ? fmt(v) : v,
-                      name === "receita" ? "Receita" : "Clientes",
-                    ]}
-                  />
+                  <Tooltip formatter={(v: number, name: string) => [name === "receita" ? fmt(v) : v, name === "receita" ? "Receita" : "Clientes"]} />
                   <Legend />
                   <Bar dataKey="clientes" fill="hsl(220, 70%, 50%)" name="Clientes" radius={[0, 4, 4, 0]} />
                   <Bar dataKey="receita" fill="hsl(142, 60%, 40%)" name="Receita (R$)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-            )}
+            ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
           </CardContent>
         </Card>
 
-        {/* Payment Methods */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Formas de Pagamento</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Formas de Pagamento</CardTitle></CardHeader>
           <CardContent>
             {paymentDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
-                  <Pie
-                    data={paymentDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    paddingAngle={2}
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {paymentDistribution.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                  <Pie data={paymentDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} paddingAngle={2} label={({ name, value }) => `${name}: ${value}`}>
+                    {paymentDistribution.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
                   </Pie>
                   <Tooltip formatter={(v: number) => [v, "Clientes"]} />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-            )}
+            ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
           </CardContent>
         </Card>
 
-        {/* Clients per Tenant Bar */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Clientes e Receita por Painel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {tenantDistribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={Math.max(200, tenantDistribution.length * 50)}>
-                <BarChart data={tenantDistribution} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 88%)" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={(v: number, name: string) => [
-                      name === "receita" ? fmt(v) : v,
-                      name === "receita" ? "Receita" : "Clientes",
-                    ]}
-                  />
-                  <Legend />
-                  <Bar dataKey="clientes" fill="hsl(280, 60%, 50%)" name="Clientes" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="receita" fill="hsl(45, 80%, 48%)" name="Receita (R$)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Financial Summary */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Resumo Financeiro Global</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Resumo Financeiro Global</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[

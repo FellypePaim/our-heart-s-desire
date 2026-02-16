@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useAllUserRoles, useTenants } from "@/hooks/useSuperAdmin";
+import { useAllUserRoles } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { Navigate } from "react-router-dom";
@@ -13,12 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -34,35 +30,21 @@ const roleLabels: Record<string, string> = {
   user: "Cliente Final",
 };
 
-const roleRank: Record<string, number> = {
-  user: 0,
-  reseller: 1,
-  panel_admin: 2,
-  super_admin: 3,
-};
+const roleRank: Record<string, number> = { user: 0, reseller: 1, panel_admin: 2, super_admin: 3 };
 
 const ITEMS_PER_PAGE = 20;
 
 type SortDir = "asc" | "desc" | null;
 type SortState = { key: string; dir: SortDir };
 
-interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
-  created_at: string;
-}
+interface UserProfile { id: string; email: string; name: string; created_at: string; }
 
 function SortableHead({ label, sortKey, sort, onSort, className }: { label: string; sortKey: string; sort: SortState; onSort: (key: string) => void; className?: string }) {
   return (
     <TableHead className={className}>
       <button onClick={() => onSort(sortKey)} className="flex items-center gap-1 hover:text-foreground transition-colors">
         {label}
-        {sort.key === sortKey ? (
-          sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-40" />
-        )}
+        {sort.key === sortKey ? (sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : (<ArrowUpDown className="h-3 w-3 opacity-40" />)}
       </button>
     </TableHead>
   );
@@ -70,7 +52,6 @@ function SortableHead({ label, sortKey, sort, onSort, className }: { label: stri
 
 function useSort(initial: string = "") {
   const [sort, setSort] = useState<SortState>({ key: initial, dir: null });
-
   const toggle = useCallback((key: string) => {
     setSort((prev) => {
       if (prev.key !== key) return { key, dir: "asc" };
@@ -79,7 +60,6 @@ function useSort(initial: string = "") {
       return { key, dir: "asc" };
     });
   }, []);
-
   const sortFn = useCallback(<T,>(items: T[], accessor: (item: T, key: string) => any): T[] => {
     if (!sort.key || !sort.dir) return items;
     return [...items].sort((a, b) => {
@@ -88,20 +68,16 @@ function useSort(initial: string = "") {
       if (va == null && vb == null) return 0;
       if (va == null) return 1;
       if (vb == null) return -1;
-      if (typeof va === "string" && typeof vb === "string") {
-        return sort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-      }
+      if (typeof va === "string" && typeof vb === "string") return sort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
       return sort.dir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
     });
   }, [sort]);
-
   return { sort, toggle, sortFn };
 }
 
 const AdminUsers = () => {
   const { isSuperAdmin, loading, user } = useAuth();
   const { data: roles, isLoading } = useAllUserRoles();
-  const { data: tenants } = useTenants();
   const [search, setSearch] = useState("");
   const { hidden, toggle: togglePrivacy } = usePrivacyMode();
   const [filterRole, setFilterRole] = useState<string>("all");
@@ -109,22 +85,18 @@ const AdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // User profiles state
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
-  // Role change modal state
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [roleModalUser, setRoleModalUser] = useState<{ userId: string; currentRole: string; roleId: string } | null>(null);
   const [selectedNewRole, setSelectedNewRole] = useState<string>("");
   const [roleChanging, setRoleChanging] = useState(false);
 
-  // Delete user state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<{ userId: string; roleId: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Create user state
   const [createOpen, setCreateOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -132,14 +104,10 @@ const AdminUsers = () => {
   const [newPhone, setNewPhone] = useState("");
   const [newPhoneError, setNewPhoneError] = useState("");
   const [newRole, setNewRole] = useState<string>("user");
-  const [newTenantId, setNewTenantId] = useState<string>("none");
   const [creating, setCreating] = useState(false);
 
   const allSort = useSort();
 
-  const tenantMap = useMemo(() => new Map(tenants?.map((t) => [t.id, t.name]) || []), [tenants]);
-
-  // Fetch user profiles
   useEffect(() => {
     if (!isSuperAdmin) return;
     const fetchProfiles = async () => {
@@ -158,19 +126,6 @@ const AdminUsers = () => {
     const p = profileMap.get(userId);
     return p?.name || p?.email?.split("@")[0] || userId.slice(0, 8);
   }, [profileMap]);
-
-  const getCreator = useCallback((role: any) => {
-    if (role.role === "super_admin") return "-";
-    if (role.role === "panel_admin" && role.tenant_id) {
-      const sa = roles?.find(r => r.role === "super_admin" && r.is_active);
-      return sa ? getUserName(sa.user_id) : "-";
-    }
-    if (role.role === "reseller" && role.tenant_id) {
-      const pa = roles?.find(r => r.role === "panel_admin" && r.tenant_id === role.tenant_id && r.is_active);
-      return pa ? getUserName(pa.user_id) : "-";
-    }
-    return "-";
-  }, [roles, getUserName]);
 
   const canActOn = useCallback((targetRole: string) => {
     return roleRank[targetRole] < roleRank["super_admin"];
@@ -191,20 +146,18 @@ const AdminUsers = () => {
       if (key === "role") return roleLabels[item.role] || item.role;
       if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
       if (key === "created_at") return item.created_at;
-      if (key === "creator") return getCreator(item);
       return (item as any)[key];
     });
-  }, [roles, filterRole, search, allSort.sortFn, getUserName, getCreator]);
+  }, [roles, filterRole, search, allSort.sortFn, getUserName]);
 
   const filterKey = `${search}|${filterRole}`;
   useMemo(() => { setPage(1); }, [filterKey]);
 
   const exportCSV = useCallback(() => {
-    const headers = ["Nome", "Cargo", "Painel", "#Criador", "Status", "Data"];
+    const headers = ["Nome", "Cargo", "Status", "Data"];
     const rows = filteredRoles.map(r => [
       getUserName(r.user_id), roleLabels[r.role] || r.role,
-      r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id : "",
-      getCreator(r), r.is_active ? "Ativo" : "Bloqueado",
+      r.is_active ? "Ativo" : "Bloqueado",
       format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
     ]);
     const bom = "\uFEFF";
@@ -217,7 +170,7 @@ const AdminUsers = () => {
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Exportado!", description: "Arquivo CSV gerado com sucesso." });
-  }, [filteredRoles, tenantMap, toast, getUserName, getCreator]);
+  }, [filteredRoles, toast, getUserName]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRoles.length / ITEMS_PER_PAGE));
   const pagedRoles = filteredRoles.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -227,10 +180,7 @@ const AdminUsers = () => {
   const handleToggleActive = async (roleId: string, currentActive: boolean, userId: string) => {
     if (!user) return;
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .update({ is_active: !currentActive })
-        .eq("id", roleId);
+      const { error } = await supabase.from("user_roles").update({ is_active: !currentActive }).eq("id", roleId);
       if (error) throw error;
       await logAudit(user.id, currentActive ? "user_blocked" : "user_unblocked", "user_role", roleId, { target_user: userId });
       toast({ title: currentActive ? "Bloqueado!" : "Desbloqueado!" });
@@ -239,7 +189,6 @@ const AdminUsers = () => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
   };
-
 
   const openRoleModal = (userId: string, currentRole: string, roleId: string) => {
     setRoleModalUser({ userId, currentRole, roleId });
@@ -251,15 +200,10 @@ const AdminUsers = () => {
     if (!roleModalUser || !user || !selectedNewRole || selectedNewRole === roleModalUser.currentRole) return;
     setRoleChanging(true);
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .update({ role: selectedNewRole as "super_admin" | "panel_admin" | "reseller" | "user" })
-        .eq("id", roleModalUser.roleId);
+      const { error } = await supabase.from("user_roles").update({ role: selectedNewRole as any }).eq("id", roleModalUser.roleId);
       if (error) throw error;
       await logAudit(user.id, "role_changed", "user_role", roleModalUser.roleId, {
-        target_user: roleModalUser.userId,
-        old_role: roleModalUser.currentRole,
-        new_role: selectedNewRole,
+        target_user: roleModalUser.userId, old_role: roleModalUser.currentRole, new_role: selectedNewRole,
       });
       toast({ title: "Cargo alterado!", description: `${getUserName(roleModalUser.userId)}: ${roleLabels[roleModalUser.currentRole]} → ${roleLabels[selectedNewRole]}` });
       queryClient.invalidateQueries({ queryKey: ["all_user_roles"] });
@@ -280,10 +224,7 @@ const AdminUsers = () => {
     if (!deletingUser || !user) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("id", deletingUser.roleId);
+      const { error } = await supabase.from("user_roles").delete().eq("id", deletingUser.roleId);
       if (error) throw error;
       await logAudit(user.id, "user_role_deleted", "user_role", deletingUser.roleId, { target_user: deletingUser.userId });
       toast({ title: "Excluído!", description: `Cargo de ${deletingUser.name} removido.` });
@@ -296,7 +237,6 @@ const AdminUsers = () => {
     }
   };
 
-  // --- Create user ---
   const handleCreateUser = async () => {
     if (!newEmail.trim() || !newPassword.trim() || !newRole) return;
     setCreating(true);
@@ -307,7 +247,6 @@ const AdminUsers = () => {
           password: newPassword,
           name: newName.trim() || undefined,
           role: newRole,
-          tenant_id: newTenantId === "none" ? null : newTenantId,
         },
       });
       if (error) throw error;
@@ -315,7 +254,6 @@ const AdminUsers = () => {
       await logAudit(user!.id, "user_created", "user", data.user_id, { email: newEmail, role: newRole });
       toast({ title: "Usuário criado!", description: `${newEmail} com cargo ${roleLabels[newRole]}` });
       queryClient.invalidateQueries({ queryKey: ["all_user_roles"] });
-      // Refresh profiles
       const { data: profilesData } = await supabase.functions.invoke("get-user-profiles");
       if (profilesData) setProfiles(profilesData);
       setCreateOpen(false);
@@ -323,7 +261,6 @@ const AdminUsers = () => {
       setNewPassword("");
       setNewName("");
       setNewRole("user");
-      setNewTenantId("none");
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -354,9 +291,7 @@ const AdminUsers = () => {
           <Input placeholder="Buscar por nome..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={filterRole} onValueChange={setFilterRole}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrar por cargo" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por cargo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os cargos</SelectItem>
             <SelectItem value="super_admin">SuperAdmin</SelectItem>
@@ -365,13 +300,7 @@ const AdminUsers = () => {
             <SelectItem value="user">Cliente Final</SelectItem>
           </SelectContent>
         </Select>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={togglePrivacy}
-          title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
-          className="h-9 w-9"
-        >
+        <Button variant="outline" size="icon" onClick={togglePrivacy} title={hidden ? "Mostrar" : "Ocultar"} className="h-9 w-9">
           {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
         <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
@@ -385,8 +314,6 @@ const AdminUsers = () => {
             <TableRow>
               <SortableHead label="Nome" sortKey="name" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Cargo" sortKey="role" sort={allSort.sort} onSort={allSort.toggle} />
-              <SortableHead label="Painel" sortKey="tenant_id" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
-              <SortableHead label="#Criador" sortKey="creator" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
               <SortableHead label="Status" sortKey="status" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Data" sortKey="created_at" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
               <TableHead>Ações</TableHead>
@@ -394,9 +321,9 @@ const AdminUsers = () => {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : filteredRoles.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
             ) : (
               pagedRoles.map((r) => {
                 const canAct = canActOn(r.role);
@@ -407,12 +334,6 @@ const AdminUsers = () => {
                       <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                         {roleLabels[r.role] || r.role}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {r.tenant_id ? tenantMap.get(r.tenant_id) || r.tenant_id.slice(0, 8) : "-"}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {hidden ? "••••" : getCreator(r)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={r.is_active ? "default" : "destructive"}>
@@ -465,13 +386,8 @@ const AdminUsers = () => {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Criar Novo Usuário
-            </DialogTitle>
-            <DialogDescription>
-              Crie uma conta com cargo e painel associado
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" /> Criar Novo Usuário</DialogTitle>
+            <DialogDescription>Crie uma conta com cargo associado</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -487,9 +403,7 @@ const AdminUsers = () => {
                   if (e.target.value.trim()) {
                     const { valid, error } = validateWhatsAppPhone(e.target.value);
                     setNewPhoneError(valid ? "" : error || "");
-                  } else {
-                    setNewPhoneError("");
-                  }
+                  } else { setNewPhoneError(""); }
                 }}
                 placeholder="(DD) 9XXXX-XXXX"
               />
@@ -506,27 +420,11 @@ const AdminUsers = () => {
             <div className="space-y-2">
               <Label>Cargo *</Label>
               <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="panel_admin">Master</SelectItem>
                   <SelectItem value="reseller">Revendedor</SelectItem>
                   <SelectItem value="user">Cliente Final</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Painel (Tenant)</Label>
-              <Select value={newTenantId} onValueChange={setNewTenantId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um painel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {tenants?.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -544,27 +442,18 @@ const AdminUsers = () => {
       <Dialog open={roleModalOpen} onOpenChange={setRoleModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCog className="h-5 w-5" />
-              Alterar Cargo
-            </DialogTitle>
-            <DialogDescription>
-              {roleModalUser && `Alterar cargo de ${getUserName(roleModalUser.userId)}`}
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" /> Alterar Cargo</DialogTitle>
+            <DialogDescription>{roleModalUser && `Alterar cargo de ${getUserName(roleModalUser.userId)}`}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Cargo atual</p>
-              <Badge variant="secondary" className="text-sm">
-                {roleModalUser ? roleLabels[roleModalUser.currentRole] || roleModalUser.currentRole : ""}
-              </Badge>
+              <Badge variant="secondary" className="text-sm">{roleModalUser ? roleLabels[roleModalUser.currentRole] || roleModalUser.currentRole : ""}</Badge>
             </div>
             <div>
               <p className="text-sm font-medium mb-2">Novo cargo</p>
               <Select value={selectedNewRole} onValueChange={setSelectedNewRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cargo" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="super_admin">SuperAdmin</SelectItem>
                   <SelectItem value="panel_admin">Master</SelectItem>
@@ -576,10 +465,7 @@ const AdminUsers = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleModalOpen(false)}>Cancelar</Button>
-            <Button
-              onClick={handleRoleChange}
-              disabled={roleChanging || selectedNewRole === roleModalUser?.currentRole}
-            >
+            <Button onClick={handleRoleChange} disabled={roleChanging || selectedNewRole === roleModalUser?.currentRole}>
               {roleChanging ? "Salvando..." : "Confirmar"}
             </Button>
           </DialogFooter>
