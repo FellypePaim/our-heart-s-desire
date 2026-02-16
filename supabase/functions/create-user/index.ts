@@ -75,6 +75,13 @@ Deno.serve(async (req) => {
 
     const effectiveTenantId = isSuperAdmin ? (tenant_id || null) : callerTenantId;
 
+    // Resellers MUST have a tenant
+    if (role === "reseller" && !effectiveTenantId) {
+      return new Response(JSON.stringify({ error: "Reseller must be assigned to a tenant/panel" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Create auth user
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
