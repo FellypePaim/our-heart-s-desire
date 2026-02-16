@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2, CalendarDays } from "lucide-react";
 import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
 import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
+import { BulkRenewDialog } from "@/components/BulkRenewDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +49,7 @@ const Clients = () => {
   const [messageClient, setMessageClient] = useState<Client | null>(null);
   const [page, setPage] = useState(1);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRenewOpen, setBulkRenewOpen] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
@@ -184,6 +186,10 @@ const Clients = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkRenewOpen(true)}>
+            <CalendarDays className="h-4 w-4" />
+            Renovar em Lote
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkOpen(true)}>
             <Users className="h-4 w-4" />
             Envio em Massa
@@ -306,6 +312,7 @@ const Clients = () => {
       <EditClientDialog client={editingClient} open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)} />
       <WhatsAppMessageDialog client={messageClient} open={!!messageClient} onOpenChange={(open) => !open && setMessageClient(null)} />
       <BulkWhatsAppDialog clients={clients || []} open={bulkOpen} onOpenChange={setBulkOpen} />
+      <BulkRenewDialog clients={clients || []} open={bulkRenewOpen} onOpenChange={setBulkRenewOpen} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
