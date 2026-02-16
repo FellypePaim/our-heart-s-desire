@@ -36,6 +36,7 @@ const ServiceConfig = () => {
   const { roles, loading, user } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
   const { data: options, isLoading } = useAllServiceOptions();
   const upsert = useUpsertServiceOption();
   const deleteOpt = useDeleteServiceOption();
@@ -51,7 +52,7 @@ const ServiceConfig = () => {
 
   const filtered = useMemo(() => options?.filter((o) => o.category === tab) || [], [options, tab]);
 
-  if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
+  if (!loading && !isPanelAdmin && !isSuperAdmin && !isReseller) return <Navigate to="/" replace />;
 
   const openCreate = () => {
     setEditing(null);
@@ -85,6 +86,9 @@ const ServiceConfig = () => {
     }
   };
 
+  // Check if current user can edit a given option
+  const isOwnOption = (opt: ServiceOption) => opt.created_by === user?.id;
+
   const handleDelete = async () => {
     if (!deletingId) return;
     try {
@@ -105,7 +109,7 @@ const ServiceConfig = () => {
   const canEdit = (opt: ServiceOption) => {
     if (isSuperAdmin) return true;
     if (opt.is_global) return false;
-    return isPanelAdmin && opt.created_by === user?.id;
+    return isOwnOption(opt);
   };
 
   return (
