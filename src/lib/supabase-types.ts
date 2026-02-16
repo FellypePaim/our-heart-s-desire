@@ -18,6 +18,7 @@ export interface Client {
   aplicativo: string | null;
   dispositivo: string | null;
   captacao: string | null;
+  forma_pagamento: string | null;
 }
 
 export interface Tenant {
