@@ -1,11 +1,17 @@
 import { useResellers } from "@/hooks/useResellers";
+import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
-import { Users, UserCheck, UserX, BarChart3 } from "lucide-react";
+import { Users, UserCheck, UserX, BarChart3, DollarSign, TrendingUp } from "lucide-react";
 
-export function ResellerMetrics() {
+interface ResellerMetricsProps {
+  mask?: (value: string | null | undefined, type: "phone" | "value" | "email" | "text") => string;
+}
+
+export function ResellerMetrics({ mask }: ResellerMetricsProps) {
   const { roles } = useAuth();
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
+  const { data: clients } = useClients();
 
   if (isLoading) {
     return (
@@ -21,17 +27,30 @@ export function ResellerMetrics() {
   const totalClients = resellers?.reduce((sum, r) => sum + (r.client_count || 0), 0) || 0;
   const avgClients = total > 0 ? Math.round(totalClients / total) : 0;
 
+  // Aggregate revenue from clients linked to resellers
+  const resellerIds = resellers?.map((r) => r.id) || [];
+  const resellerClients = clients?.filter((c) => c.reseller_id && resellerIds.includes(c.reseller_id)) || [];
+  const totalResellerRevenue = resellerClients.reduce((sum, c) => sum + (c.valor || 0), 0);
+  const avgRevenuePerReseller = total > 0 ? totalResellerRevenue / total : 0;
+
+  const fmt = (v: number) => {
+    if (mask) return mask(String(v), "value");
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+  };
+
   const kpis = [
-    { label: "Total Revendedores", value: total, icon: Users, color: "text-foreground" },
-    { label: "Ativos", value: active, icon: UserCheck, color: "text-status-active" },
-    { label: "Suspensos", value: suspended, icon: UserX, color: "text-status-expired" },
-    { label: "Total Clientes (agregado)", value: totalClients, icon: BarChart3, color: "text-blue-600" },
-    { label: "Média Clientes/Revendedor", value: avgClients, icon: BarChart3, color: "text-muted-foreground" },
+    { label: "Total Revendedores", value: String(total), icon: Users, color: "text-foreground" },
+    { label: "Ativos", value: String(active), icon: UserCheck, color: "text-status-active" },
+    { label: "Suspensos", value: String(suspended), icon: UserX, color: "text-status-expired" },
+    { label: "Total Clientes (agregado)", value: String(totalClients), icon: BarChart3, color: "text-blue-600" },
+    { label: "Média Clientes/Revendedor", value: String(avgClients), icon: BarChart3, color: "text-muted-foreground" },
+    { label: "Receita Agregada", value: fmt(totalResellerRevenue), icon: DollarSign, color: "text-emerald-600" },
+    { label: "Receita Média/Revendedor", value: fmt(avgRevenuePerReseller), icon: TrendingUp, color: "text-status-active" },
   ];
 
   return (
     <div className="space-y-6 p-4 md:p-6 overflow-auto">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-lg border bg-card p-4 space-y-1">
             <div className="flex items-center gap-2">
@@ -52,6 +71,7 @@ export function ResellerMetrics() {
                 <th className="text-left px-4 py-3 font-medium">Revendedor</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-right px-4 py-3 font-medium">Clientes</th>
+                <th className="text-right px-4 py-3 font-medium">Receita</th>
                 <th className="text-right px-4 py-3 font-medium">Limite</th>
                 <th className="text-right px-4 py-3 font-medium">Uso %</th>
               </tr>
@@ -60,6 +80,8 @@ export function ResellerMetrics() {
               {resellers.map((r) => {
                 const limit = r.limits?.max_clients || 50;
                 const usage = Math.round(((r.client_count || 0) / limit) * 100);
+                const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
+                const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
                 return (
                   <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{r.display_name}</td>
@@ -73,6 +95,7 @@ export function ResellerMetrics() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{r.client_count || 0}</td>
+                    <td className="px-4 py-3 text-right font-mono">{fmt(rRevenue)}</td>
                     <td className="px-4 py-3 text-right font-mono text-muted-foreground">{limit}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
