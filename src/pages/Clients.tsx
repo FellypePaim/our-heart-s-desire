@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2 } from "lucide-react";
 import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
+import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +48,7 @@ const Clients = () => {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [messageClient, setMessageClient] = useState<Client | null>(null);
   const [page, setPage] = useState(1);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -190,6 +192,15 @@ const Clients = () => {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setBulkOpen(true)}
+          >
+            <Users className="h-4 w-4" />
+            Envio em Massa
+          </Button>
+          <Button
+            variant="outline"
             size="icon"
             onClick={toggle}
             title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
@@ -329,6 +340,12 @@ const Clients = () => {
         client={messageClient}
         open={!!messageClient}
         onOpenChange={(open) => !open && setMessageClient(null)}
+      />
+
+      <BulkWhatsAppDialog
+        clients={clients || []}
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
       />
 
       {/* Delete Confirmation */}
