@@ -17,8 +17,6 @@ interface AuthContextType {
   roles: UserRole[];
   isSuperAdmin: boolean;
   currentTenantId: string | null;
-  impersonating: { userId: string; tenantId: string | null; sessionId: string } | null;
-  setImpersonating: (imp: { userId: string; tenantId: string | null; sessionId: string } | null) => void;
   signOut: () => Promise<void>;
 }
 
@@ -29,8 +27,6 @@ const AuthContext = createContext<AuthContextType>({
   roles: [],
   isSuperAdmin: false,
   currentTenantId: null,
-  impersonating: null,
-  setImpersonating: () => {},
   signOut: async () => {},
 });
 
@@ -38,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<UserRole[]>([]);
-  const [impersonating, setImpersonating] = useState<{ userId: string; tenantId: string | null; sessionId: string } | null>(null);
+  
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -76,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.user?.id]);
 
   const signOut = async () => {
-    setImpersonating(null);
     await supabase.auth.signOut();
   };
 
@@ -92,8 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         isSuperAdmin,
         currentTenantId,
-        impersonating,
-        setImpersonating,
         signOut,
       }}
     >

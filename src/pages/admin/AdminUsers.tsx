@@ -99,7 +99,7 @@ function useSort(initial: string = "") {
 }
 
 const AdminUsers = () => {
-  const { isSuperAdmin, loading, user, setImpersonating } = useAuth();
+  const { isSuperAdmin, loading, user } = useAuth();
   const { data: roles, isLoading } = useAllUserRoles();
   const { data: tenants } = useTenants();
   const [search, setSearch] = useState("");
@@ -240,22 +240,6 @@ const AdminUsers = () => {
     }
   };
 
-  const handleImpersonate = async (targetUserId: string, tenantId: string | null) => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase.from("impersonate_sessions").insert({
-        super_admin_id: user.id,
-        target_user_id: targetUserId,
-        target_tenant_id: tenantId,
-      }).select("id").single();
-      if (error) throw error;
-      await logAudit(user.id, "impersonate_start", "user", targetUserId, { tenant_id: tenantId });
-      setImpersonating({ userId: targetUserId, tenantId, sessionId: data.id });
-      toast({ title: "Modo Suporte", description: "Você está agora em modo impersonate." });
-    } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
-    }
-  };
 
   const openRoleModal = (userId: string, currentRole: string, roleId: string) => {
     setRoleModalUser({ userId, currentRole, roleId });
@@ -447,9 +431,6 @@ const AdminUsers = () => {
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleToggleActive(r.id, r.is_active, r.user_id)} title={r.is_active ? "Bloquear" : "Desbloquear"}>
                               {r.is_active ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleImpersonate(r.user_id, r.tenant_id)} title="Impersonate">
-                              <Eye className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(r.user_id, r.id)} title="Excluir">
                               <Trash2 className="h-4 w-4 text-destructive" />
