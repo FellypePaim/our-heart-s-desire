@@ -109,8 +109,10 @@ const AdminUsers = () => {
   // Limits modal state
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [limitsUserId, setLimitsUserId] = useState<string | null>(null);
+  const [limitsRole, setLimitsRole] = useState<string>("panel_admin");
   const [limitsMaxClients, setLimitsMaxClients] = useState(200);
   const [limitsMaxResellers, setLimitsMaxResellers] = useState(10);
+  const [limitsMaxMessages, setLimitsMaxMessages] = useState(500);
   const [limitsSaving, setLimitsSaving] = useState(false);
 
   const allSort = useSort();
@@ -244,20 +246,37 @@ const AdminUsers = () => {
     }
   };
 
-  const openLimitsModal = async (userId: string) => {
+  const openLimitsModal = async (userId: string, role: string) => {
     setLimitsUserId(userId);
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("limits")
-        .eq("user_id", userId)
-        .maybeSingle();
-      const l = (data?.limits as any) || {};
-      setLimitsMaxClients(l.max_clients ?? 200);
-      setLimitsMaxResellers(l.max_resellers ?? 10);
-    } catch {
-      setLimitsMaxClients(200);
-      setLimitsMaxResellers(10);
+    setLimitsRole(role);
+    if (role === "panel_admin") {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("limits")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const l = (data?.limits as any) || {};
+        setLimitsMaxClients(l.max_clients ?? 200);
+        setLimitsMaxResellers(l.max_resellers ?? 10);
+      } catch {
+        setLimitsMaxClients(200);
+        setLimitsMaxResellers(10);
+      }
+    } else if (role === "reseller") {
+      try {
+        const { data } = await supabase
+          .from("resellers")
+          .select("limits")
+          .eq("owner_user_id", userId)
+          .maybeSingle();
+        const l = (data?.limits as any) || {};
+        setLimitsMaxClients(l.max_clients ?? 50);
+        setLimitsMaxMessages(l.max_messages_month ?? 500);
+      } catch {
+        setLimitsMaxClients(50);
+        setLimitsMaxMessages(500);
+      }
     }
     setLimitsOpen(true);
   };
@@ -266,29 +285,38 @@ const AdminUsers = () => {
     if (!limitsUserId || !user) return;
     setLimitsSaving(true);
     try {
-      const newLimits = { max_clients: limitsMaxClients, max_resellers: limitsMaxResellers };
-      // Upsert profile with limits
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", limitsUserId)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
+      if (limitsRole === "panel_admin") {
+        const newLimits = { max_clients: limitsMaxClients, max_resellers: limitsMaxResellers };
+        const { data: existing } = await supabase
           .from("profiles")
+          .select("id")
+          .eq("user_id", limitsUserId)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from("profiles")
+            .update({ limits: newLimits as any })
+            .eq("user_id", limitsUserId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("profiles")
+            .insert({ user_id: limitsUserId, limits: newLimits as any });
+          if (error) throw error;
+        }
+        await logAudit(user.id, "limits_updated", "user", limitsUserId, newLimits);
+        toast({ title: "Limites atualizados!", description: `Máx. clientes: ${limitsMaxClients}, Máx. revendedores: ${limitsMaxResellers}` });
+      } else if (limitsRole === "reseller") {
+        const newLimits = { max_clients: limitsMaxClients, max_messages_month: limitsMaxMessages };
+        const { error } = await supabase
+          .from("resellers")
           .update({ limits: newLimits as any })
-          .eq("user_id", limitsUserId);
+          .eq("owner_user_id", limitsUserId);
         if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("profiles")
-          .insert({ user_id: limitsUserId, limits: newLimits as any });
-        if (error) throw error;
+        await logAudit(user.id, "reseller_limits_updated", "reseller", limitsUserId, newLimits);
+        toast({ title: "Limites atualizados!", description: `Máx. clientes: ${limitsMaxClients}, Máx. mensagens: ${limitsMaxMessages}` });
       }
-
-      await logAudit(user.id, "limits_updated", "user", limitsUserId, newLimits);
-      toast({ title: "Limites atualizados!", description: `Máx. clientes: ${limitsMaxClients}, Máx. revendedores: ${limitsMaxResellers}` });
       setLimitsOpen(false);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -410,8 +438,8 @@ const AdminUsers = () => {
                             <Button variant="ghost" size="icon" onClick={() => openRoleModal(r.user_id, r.role, r.id)} title="Alterar cargo">
                               <UserCog className="h-4 w-4" />
                             </Button>
-                            {r.role === "panel_admin" && (
-                              <Button variant="ghost" size="icon" onClick={() => openLimitsModal(r.user_id)} title="Configurar limites">
+                            {(r.role === "panel_admin" || r.role === "reseller") && (
+                              <Button variant="ghost" size="icon" onClick={() => openLimitsModal(r.user_id, r.role)} title="Configurar limites">
                                 <SlidersHorizontal className="h-4 w-4" />
                               </Button>
                             )}
@@ -561,7 +589,7 @@ const AdminUsers = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <SlidersHorizontal className="h-5 w-5" />
-              Limites do Master
+              {limitsRole === "panel_admin" ? "Limites do Master" : "Limites do Revendedor"}
             </DialogTitle>
             <DialogDescription>
               {limitsUserId && `Definir limites para ${getUserName(limitsUserId)}`}
@@ -569,15 +597,28 @@ const AdminUsers = () => {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Máx. Clientes Diretos</Label>
+              <Label>{limitsRole === "panel_admin" ? "Máx. Clientes Diretos" : "Máx. Clientes"}</Label>
               <Input type="number" min={1} value={limitsMaxClients} onChange={(e) => setLimitsMaxClients(Number(e.target.value))} />
-              <p className="text-xs text-muted-foreground">Quantidade máxima de clientes que este Master pode cadastrar diretamente.</p>
+              <p className="text-xs text-muted-foreground">
+                {limitsRole === "panel_admin"
+                  ? "Quantidade máxima de clientes que este Master pode cadastrar diretamente."
+                  : "Quantidade máxima de clientes que este Revendedor pode cadastrar."}
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label>Máx. Revendedores</Label>
-              <Input type="number" min={0} value={limitsMaxResellers} onChange={(e) => setLimitsMaxResellers(Number(e.target.value))} />
-              <p className="text-xs text-muted-foreground">Quantidade máxima de revendedores que este Master pode criar.</p>
-            </div>
+            {limitsRole === "panel_admin" && (
+              <div className="space-y-2">
+                <Label>Máx. Revendedores</Label>
+                <Input type="number" min={0} value={limitsMaxResellers} onChange={(e) => setLimitsMaxResellers(Number(e.target.value))} />
+                <p className="text-xs text-muted-foreground">Quantidade máxima de revendedores que este Master pode criar.</p>
+              </div>
+            )}
+            {limitsRole === "reseller" && (
+              <div className="space-y-2">
+                <Label>Máx. Mensagens/mês</Label>
+                <Input type="number" min={0} value={limitsMaxMessages} onChange={(e) => setLimitsMaxMessages(Number(e.target.value))} />
+                <p className="text-xs text-muted-foreground">Quantidade máxima de mensagens que este Revendedor pode enviar por mês.</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLimitsOpen(false)}>Cancelar</Button>

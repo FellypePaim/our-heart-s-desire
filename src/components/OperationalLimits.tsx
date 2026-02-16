@@ -33,7 +33,7 @@ export function OperationalLimits() {
   // Fetch reseller count for Master
   const { data: resellers } = useResellers();
 
-  const limits = useMemo(() => {
+  const sections = useMemo(() => {
     if (!clients) return null;
 
     if (isReseller && myReseller) {
@@ -41,13 +41,22 @@ export function OperationalLimits() {
       const maxMessages = myReseller.limits?.max_messages_month || 500;
       const currentClients = clients.filter((c) => c.reseller_id === myReseller.id).length;
 
-      return {
-        label: "Revendedor",
-        items: [
-          { name: "Clientes", current: currentClients, max: maxClients },
-          { name: "Mensagens/mês", current: 0, max: maxMessages },
-        ],
-      };
+      return [
+        {
+          label: "Clientes",
+          icon: "clients" as const,
+          items: [
+            { name: "Clientes cadastrados", current: currentClients, max: maxClients },
+          ],
+        },
+        {
+          label: "Mensagens",
+          icon: "messages" as const,
+          items: [
+            { name: "Mensagens/mês", current: 0, max: maxMessages },
+          ],
+        },
+      ];
     }
 
     if (isPanelAdmin) {
@@ -57,50 +66,66 @@ export function OperationalLimits() {
       const directClients = clients.filter((c) => c.user_id === user?.id).length;
       const resellerCount = resellers?.length || 0;
 
-      return {
-        label: "Master",
-        items: [
-          { name: "Clientes diretos", current: directClients, max: maxClients },
-          { name: "Revendedores", current: resellerCount, max: maxResellers },
-        ],
-      };
+      return [
+        {
+          label: "Clientes",
+          icon: "clients" as const,
+          items: [
+            { name: "Clientes diretos", current: directClients, max: maxClients },
+          ],
+        },
+        {
+          label: "Revendedores",
+          icon: "resellers" as const,
+          items: [
+            { name: "Revendedores criados", current: resellerCount, max: maxResellers },
+          ],
+        },
+      ];
     }
 
     return null;
   }, [clients, myReseller, isReseller, isPanelAdmin, user?.id, profile, resellers]);
 
-  if (!limits) return null;
+  if (!sections) return null;
+
+  const roleLabel = isReseller ? "Revendedor" : "Master";
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-4">
       <h3 className="text-sm font-semibold flex items-center gap-2">
         <Users className="h-4 w-4" />
-        Limites Operacionais — {limits.label}
+        Limites Operacionais — {roleLabel}
       </h3>
-      <div className="space-y-3">
-        {limits.items.map((item) => {
-          const pct = item.max > 0 ? Math.min(100, Math.round((item.current / item.max) * 100)) : 0;
-          const isNearLimit = pct >= 80;
-          const isAtLimit = pct >= 100;
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sections.map((section) => (
+          <div key={section.label} className="space-y-3 rounded-md border bg-muted/30 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.label}</p>
+            {section.items.map((item) => {
+              const pct = item.max > 0 ? Math.min(100, Math.round((item.current / item.max) * 100)) : 0;
+              const isNearLimit = pct >= 80;
+              const isAtLimit = pct >= 100;
 
-          return (
-            <div key={item.name} className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  {item.name}
-                  {isNearLimit && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-                </span>
-                <span className={`font-mono font-medium ${isAtLimit ? "text-destructive" : isNearLimit ? "text-amber-500" : "text-foreground"}`}>
-                  {item.current} / {item.max}
-                </span>
-              </div>
-              <Progress value={pct} className="h-2" />
-              {isAtLimit && (
-                <p className="text-xs text-destructive">Limite atingido! Contate o administrador para aumentar.</p>
-              )}
-            </div>
-          );
-        })}
+              return (
+                <div key={item.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      {item.name}
+                      {isNearLimit && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                    </span>
+                    <span className={`font-mono font-medium ${isAtLimit ? "text-destructive" : isNearLimit ? "text-amber-500" : "text-foreground"}`}>
+                      {item.current} / {item.max}
+                    </span>
+                  </div>
+                  <Progress value={pct} className="h-2" />
+                  {isAtLimit && (
+                    <p className="text-xs text-destructive">Limite atingido! Contate o administrador para aumentar.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

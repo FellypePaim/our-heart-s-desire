@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLimitCheck } from "@/hooks/useLimitCheck";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface UserProfile {
   id: string;
@@ -62,6 +64,7 @@ const Resellers = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreateReseller, resellerLimitMsg } = useLimitCheck();
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -222,9 +225,19 @@ const Resellers = () => {
           </p>
         </div>
 
-        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> Novo Revendedor
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Button className="gap-2" disabled={!canCreateReseller} onClick={() => canCreateReseller && setCreateOpen(true)}>
+                {!canCreateReseller && <AlertTriangle className="h-4 w-4" />}
+                <Plus className="h-4 w-4" /> Novo Revendedor
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!canCreateReseller && (
+            <TooltipContent><p>{resellerLimitMsg}</p></TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
