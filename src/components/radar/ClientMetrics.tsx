@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Client } from "@/lib/supabase-types";
 import { getStatusFromDate, StatusKey } from "@/lib/status";
 import {
@@ -9,6 +9,8 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
 } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { subDays, subMonths, isAfter, startOfDay } from "date-fns";
 
 interface ClientMetricsProps {
   clients: Client[];
@@ -38,20 +40,64 @@ const STATUS_LABELS: Record<StatusKey, string> = {
   expired: "Vencido",
 };
 
+type PeriodFilter = "all" | "7d" | "30d" | "90d" | "this_month" | "last_month";
+
+const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
+  { value: "all", label: "Todos os períodos" },
+  { value: "7d", label: "Últimos 7 dias" },
+  { value: "30d", label: "Últimos 30 dias" },
+  { value: "90d", label: "Últimos 90 dias" },
+  { value: "this_month", label: "Este mês" },
+  { value: "last_month", label: "Mês anterior" },
+];
+
+function getFilteredClients(clients: Client[], period: PeriodFilter): Client[] {
+  if (period === "all") return clients;
+
+  const now = new Date();
+  let startDate: Date;
+
+  switch (period) {
+    case "7d":
+      startDate = subDays(now, 7);
+      break;
+    case "30d":
+      startDate = subDays(now, 30);
+      break;
+    case "90d":
+      startDate = subDays(now, 90);
+      break;
+    case "this_month":
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case "last_month": {
+      const lastMonth = subMonths(now, 1);
+      startDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      return clients.filter((c) => {
+        const created = new Date(c.created_at);
+        return isAfter(created, startDate) && !isAfter(created, endDate);
+      });
+    }
+    default:
+      return clients;
+  }
+
+  return clients.filter((c) => isAfter(new Date(c.created_at), startOfDay(startDate)));
+}
+
 export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) {
+  const [period, setPeriod] = useState<PeriodFilter>("all");
+
+  const filteredClients = useMemo(() => getFilteredClients(clients, period), [clients, period]);
+
   const metrics = useMemo(() => {
-    if (!clients || clients.length === 0) {
+    const list = filteredClients;
+    if (!list || list.length === 0) {
       return {
-        total: 0,
-        active: 0,
-        overdue: 0,
-        urgent: 0,
-        totalRevenue: 0,
-        avgTicket: 0,
-        forecastRevenue: 0,
-        overdueRevenue: 0,
-        todayRevenue: 0,
-        todayCount: 0,
+        total: 0, active: 0, overdue: 0, urgent: 0,
+        totalRevenue: 0, avgTicket: 0, forecastRevenue: 0,
+        overdueRevenue: 0, todayRevenue: 0, todayCount: 0,
         statusBreakdown: [] as { name: string; value: number; color: string }[],
         serverBreakdown: [] as { name: string; clientes: number; receita: number }[],
         paymentBreakdown: [] as { name: string; value: number; color: string }[],
@@ -63,7 +109,7 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       today: [], post1: [], post2: [], expired: [],
     };
 
-    clients.forEach((c) => {
+    list.forEach((c) => {
       const status = getStatusFromDate(c.expiration_date);
       groups[status.key].push(c);
     });
@@ -72,13 +118,12 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
     const overdueClients = [...groups.post1, ...groups.post2, ...groups.expired];
     const urgentClients = [...groups.today, ...groups.pre1];
 
-    const totalRevenue = clients.reduce((sum, c) => sum + (c.valor || 0), 0);
+    const totalRevenue = list.reduce((sum, c) => sum + (c.valor || 0), 0);
     const activeRevenue = activeClients.reduce((sum, c) => sum + (c.valor || 0), 0);
     const overdueRevenue = overdueClients.reduce((sum, c) => sum + (c.valor || 0), 0);
     const todayRevenue = groups.today.reduce((sum, c) => sum + (c.valor || 0), 0);
-    const avgTicket = clients.length > 0 ? totalRevenue / clients.length : 0;
+    const avgTicket = list.length > 0 ? totalRevenue / list.length : 0;
 
-    // Status breakdown for pie chart
     const statusBreakdown = (Object.keys(groups) as StatusKey[])
       .filter((key) => groups[key].length > 0)
       .map((key) => ({
@@ -87,9 +132,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
         color: STATUS_COLORS[key],
       }));
 
-    // Server breakdown for bar chart
     const serverMap: Record<string, { clientes: number; receita: number }> = {};
-    clients.forEach((c) => {
+    list.forEach((c) => {
       const srv = c.servidor || "Sem servidor";
       if (!serverMap[srv]) serverMap[srv] = { clientes: 0, receita: 0 };
       serverMap[srv].clientes++;
@@ -100,9 +144,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       .sort((a, b) => b.clientes - a.clientes)
       .slice(0, 8);
 
-    // Payment breakdown for pie chart
     const paymentMap: Record<string, number> = {};
-    clients.forEach((c) => {
+    list.forEach((c) => {
       const pay = c.forma_pagamento || "Não informado";
       paymentMap[pay] = (paymentMap[pay] || 0) + 1;
     });
@@ -112,7 +155,7 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       .sort((a, b) => b.value - a.value);
 
     return {
-      total: clients.length,
+      total: list.length,
       active: activeClients.length,
       overdue: overdueClients.length,
       urgent: urgentClients.length,
@@ -126,7 +169,7 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       serverBreakdown,
       paymentBreakdown,
     };
-  }, [clients]);
+  }, [filteredClients]);
 
   if (isLoading) {
     return (
@@ -159,6 +202,22 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
 
   return (
     <div className="space-y-6 p-4 md:p-6 overflow-auto">
+      {/* Period Filter */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-muted-foreground">Métricas de Clientes</h3>
+        <Select value={period} onValueChange={(v: PeriodFilter) => setPeriod(v)}>
+          <SelectTrigger className="w-[200px]">
+            <CalendarCheck className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {kpiCards.map((kpi) => (
