@@ -10,8 +10,8 @@ const AdminSettings = () => {
   const settingsGroups = [
     {
       title: "Templates Padrão WhatsApp",
-      desc: "Templates padrão aplicados a novos painéis",
-      content: "Configure templates padrão para novos painéis aqui...",
+      desc: "Templates padrão aplicados a novos usuários",
+      content: "Configure templates padrão para novos usuários aqui...",
     },
     {
       title: "Parâmetros de Envio",
@@ -22,11 +22,6 @@ const AdminSettings = () => {
       title: "Timezone Padrão",
       desc: "Fuso horário padrão do sistema",
       content: "America/Sao_Paulo",
-    },
-    {
-      title: "Limites Padrão para Novos Painéis",
-      desc: "Valores padrão aplicados ao criar um novo painel",
-      content: "Revendedores: 10 | Clientes: 100 | Mensagens/mês: 1000",
     },
   ];
 

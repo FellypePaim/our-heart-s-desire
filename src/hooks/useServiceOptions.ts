@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth";
 
 export interface ServiceOption {
   id: string;
-  tenant_id: string | null;
+  created_by: string | null;
   category: string;
   name: string;
   config: Record<string, any>;
@@ -69,7 +69,7 @@ export function useUpsertServiceOption() {
           category: option.category!,
           name: option.name!,
           config: (option.config || {}) as any,
-          tenant_id: option.tenant_id || null,
+          created_by: option.created_by || null,
           is_global: option.is_global ?? false,
         });
         if (error) throw error;

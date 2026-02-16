@@ -36,8 +36,7 @@ const Clients = () => {
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
-  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
-  const { data: resellers } = useResellers((isPanelAdmin || isSuperAdmin) ? tenantId : undefined);
+  const { data: resellers } = useResellers();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -50,12 +49,10 @@ const Clients = () => {
   const [page, setPage] = useState(1);
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Reseller map for showing creator
   const resellerMap = useMemo(() => {
     const map = new Map<string, string>();
     resellers?.forEach(r => map.set(r.id, r.display_name));
@@ -66,11 +63,9 @@ const Clients = () => {
     if (!clients) return [];
     let result = clients;
 
-    // Ownership filter - "mine" shows only user's own clients
     if (ownershipFilter === "mine") {
       result = result.filter((c) => c.user_id === user?.id);
     }
-    // For panel admin, allow filtering by reseller
     if ((isPanelAdmin || isSuperAdmin) && resellerFilter !== "all") {
       result = result.filter((c) => c.reseller_id === resellerFilter);
     }
@@ -174,7 +169,6 @@ const Clients = () => {
     return "-";
   };
 
-  // Show creator column for panel_admin and super_admin
   const showCreator = isPanelAdmin || isSuperAdmin;
 
   return (
@@ -190,22 +184,11 @@ const Clients = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setBulkOpen(true)}
-          >
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkOpen(true)}>
             <Users className="h-4 w-4" />
             Envio em Massa
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggle}
-            title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
-            className="h-9 w-9"
-          >
+          <Button variant="outline" size="icon" onClick={toggle} title={hidden ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"} className="h-9 w-9">
             {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
           <AddClientDialog />
@@ -215,12 +198,7 @@ const Clients = () => {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, telefone, plano, servidor..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Buscar por nome, telefone, plano, servidor..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
           <SelectTrigger className="w-[220px]">
@@ -324,31 +302,11 @@ const Clients = () => {
         </div>
       )}
 
-      <ClientDetailDialog
-        client={selectedClient}
-        open={!!selectedClient}
-        onOpenChange={(open) => !open && setSelectedClient(null)}
-      />
+      <ClientDetailDialog client={selectedClient} open={!!selectedClient} onOpenChange={(open) => !open && setSelectedClient(null)} />
+      <EditClientDialog client={editingClient} open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)} />
+      <WhatsAppMessageDialog client={messageClient} open={!!messageClient} onOpenChange={(open) => !open && setMessageClient(null)} />
+      <BulkWhatsAppDialog clients={clients || []} open={bulkOpen} onOpenChange={setBulkOpen} />
 
-      <EditClientDialog
-        client={editingClient}
-        open={!!editingClient}
-        onOpenChange={(open) => !open && setEditingClient(null)}
-      />
-
-      <WhatsAppMessageDialog
-        client={messageClient}
-        open={!!messageClient}
-        onOpenChange={(open) => !open && setMessageClient(null)}
-      />
-
-      <BulkWhatsAppDialog
-        clients={clients || []}
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-      />
-
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

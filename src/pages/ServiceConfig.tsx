@@ -17,12 +17,8 @@ import {
 import { Server, Plus, Pencil, Trash2 } from "lucide-react";
 
 const categoryLabels: Record<string, string> = {
-  plan: "Planos",
-  server: "Servidores",
-  app: "Aplicativos",
-  device: "Dispositivos",
-  pagamento: "Formas de Pagamento",
-  captacao: "Captação",
+  plan: "Planos", server: "Servidores", app: "Aplicativos",
+  device: "Dispositivos", pagamento: "Formas de Pagamento", captacao: "Captação",
 };
 
 const planConfigFields = [
@@ -40,7 +36,6 @@ const ServiceConfig = () => {
   const { roles, loading, user } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
-  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: options, isLoading } = useAllServiceOptions();
   const upsert = useUpsertServiceOption();
   const deleteOpt = useDeleteServiceOption();
@@ -80,7 +75,7 @@ const ServiceConfig = () => {
         category: tab,
         name: formName.trim(),
         config: formConfig,
-        tenant_id: editing?.tenant_id || (isSuperAdmin ? null : tenantId),
+        created_by: editing?.created_by || (isSuperAdmin ? null : user?.id || null),
         is_global: editing?.is_global ?? isSuperAdmin,
       });
       toast({ title: editing ? "Atualizado!" : "Criado!", description: `${formName} salvo com sucesso.` });
@@ -109,8 +104,8 @@ const ServiceConfig = () => {
 
   const canEdit = (opt: ServiceOption) => {
     if (isSuperAdmin) return true;
-    if (opt.is_global) return false; // tenant admins can't edit global
-    return isPanelAdmin && opt.tenant_id === tenantId;
+    if (opt.is_global) return false;
+    return isPanelAdmin && opt.created_by === user?.id;
   };
 
   return (
@@ -147,14 +142,7 @@ const ServiceConfig = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
-                    {cat === "plan" && (
-                      <>
-                        <TableHead>Preço</TableHead>
-                        <TableHead>Créditos</TableHead>
-                        <TableHead>Telas</TableHead>
-                        <TableHead className="hidden md:table-cell">Duração</TableHead>
-                      </>
-                    )}
+                    {cat === "plan" && (<><TableHead>Preço</TableHead><TableHead>Créditos</TableHead><TableHead>Telas</TableHead><TableHead className="hidden md:table-cell">Duração</TableHead></>)}
                     {cat === "server" && <TableHead>Custo/Crédito</TableHead>}
                     <TableHead>Escopo</TableHead>
                     <TableHead>Ações</TableHead>
@@ -169,32 +157,19 @@ const ServiceConfig = () => {
                     filtered.map((opt) => (
                       <TableRow key={opt.id}>
                         <TableCell className="font-medium">{opt.name}</TableCell>
-                        {cat === "plan" && (
-                          <>
-                            <TableCell className="font-mono">R$ {opt.config?.price || 0}</TableCell>
-                            <TableCell className="font-mono">{opt.config?.credits || 0}</TableCell>
-                            <TableCell className="font-mono">{opt.config?.screens || 1}</TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground">{opt.config?.duration_months || 1} mês(es)</TableCell>
-                          </>
-                        )}
-                        {cat === "server" && (
-                          <TableCell className="font-mono">R$ {opt.config?.cost_per_credit || 0}</TableCell>
-                        )}
+                        {cat === "plan" && (<><TableCell className="font-mono">R$ {opt.config?.price || 0}</TableCell><TableCell className="font-mono">{opt.config?.credits || 0}</TableCell><TableCell className="font-mono">{opt.config?.screens || 1}</TableCell><TableCell className="hidden md:table-cell text-muted-foreground">{opt.config?.duration_months || 1} mês(es)</TableCell></>)}
+                        {cat === "server" && (<TableCell className="font-mono">R$ {opt.config?.cost_per_credit || 0}</TableCell>)}
                         <TableCell>
                           <Badge variant={opt.is_global ? "default" : "secondary"}>
-                            {opt.is_global ? "Global" : "Tenant"}
+                            {opt.is_global ? "Global" : "Local"}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
                             {canEdit(opt) && (
                               <>
-                                <Button variant="ghost" size="icon" onClick={() => openEdit(opt)} title="Editar">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => { setDeletingId(opt.id); setDeleteOpen(true); }} title="Excluir">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => openEdit(opt)} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => { setDeletingId(opt.id); setDeleteOpen(true); }} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                               </>
                             )}
                           </div>
@@ -209,12 +184,9 @@ const ServiceConfig = () => {
         ))}
       </Tabs>
 
-      {/* Edit/Create Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar" : "Criar"} {categoryLabels[tab]?.slice(0, -1)}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Editar" : "Criar"} {categoryLabels[tab]?.slice(0, -1)}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Nome *</Label>
@@ -223,25 +195,17 @@ const ServiceConfig = () => {
             {getConfigFields().map((field) => (
               <div key={field.key} className="space-y-2">
                 <Label>{field.label}</Label>
-                <Input
-                  type={field.type}
-                  step={field.type === "number" ? "0.01" : undefined}
-                  value={formConfig[field.key] ?? ""}
-                  onChange={(e) => setFormConfig({ ...formConfig, [field.key]: field.type === "number" ? Number(e.target.value) : e.target.value })}
-                />
+                <Input type={field.type} step={field.type === "number" ? "0.01" : undefined} value={formConfig[field.key] ?? ""} onChange={(e) => setFormConfig({ ...formConfig, [field.key]: field.type === "number" ? Number(e.target.value) : e.target.value })} />
               </div>
             ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={upsert.isPending || !formName.trim()}>
-              {upsert.isPending ? "Salvando..." : "Salvar"}
-            </Button>
+            <Button onClick={handleSave} disabled={upsert.isPending || !formName.trim()}>{upsert.isPending ? "Salvando..." : "Salvar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -250,9 +214,7 @@ const ServiceConfig = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

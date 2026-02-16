@@ -14,7 +14,6 @@ import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminTenants from "./pages/admin/AdminTenants";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAudit from "./pages/admin/AdminAudit";
@@ -48,7 +47,6 @@ function ProtectedLayout() {
             <Route path="/service-config" element={<ServiceConfig />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/tenants" element={<AdminTenants />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/admin/audit" element={<AdminAudit />} />

@@ -4,37 +4,31 @@ import { useAuth } from "./useAuth";
 
 export interface Reseller {
   id: string;
-  tenant_id: string;
   owner_user_id: string;
   display_name: string;
   status: string;
   limits: { max_clients?: number; max_messages_month?: number };
   created_at: string;
   updated_at: string;
+  created_by: string | null;
   client_count?: number;
 }
 
-export function useResellers(tenantId?: string | null) {
+export function useResellers() {
   const { user, roles } = useAuth();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
-  const effectiveTenantId = tenantId || roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
+  const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
 
   return useQuery({
-    queryKey: ["resellers", effectiveTenantId],
+    queryKey: ["resellers"],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("resellers")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (effectiveTenantId) {
-        query = query.eq("tenant_id", effectiveTenantId);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
 
-      // Get client counts per reseller
       const resellers = data as Reseller[];
       if (resellers.length > 0) {
         const { data: counts } = await supabase
@@ -54,7 +48,7 @@ export function useResellers(tenantId?: string | null) {
 
       return resellers;
     },
-    enabled: !!user && (isPanelAdmin || roles.some((r) => r.role === "super_admin")),
+    enabled: !!user && (isPanelAdmin || isSuperAdmin),
   });
 }
 

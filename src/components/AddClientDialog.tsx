@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,6 @@ export function AddClientDialog() {
   const { data: pagamentos } = useServiceOptions("pagamento");
 
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
-  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
 
   const resetForm = () => {
     setName(""); setPhone(""); setPhoneError(""); setPlan(""); setExpirationDate("");
@@ -74,7 +73,6 @@ export function AddClientDialog() {
     e.preventDefault();
     if (!user) return;
 
-    // Validate phone
     if (phone.trim()) {
       const { valid, error } = validateWhatsAppPhone(phone);
       if (!valid) {
@@ -103,7 +101,6 @@ export function AddClientDialog() {
         forma_pagamento: formaPagamento || "",
       };
 
-      if (tenantId) insertData.tenant_id = tenantId;
       if (isReseller && myReseller) insertData.reseller_id = myReseller.id;
 
       const { error } = await supabase.from("clients").insert(insertData);
@@ -141,25 +138,15 @@ export function AddClientDialog() {
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="phone">WhatsApp *</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                placeholder="(DD) 9XXXX-XXXX"
-                required
-              />
+              <Input id="phone" value={phone} onChange={(e) => handlePhoneChange(e.target.value)} placeholder="(DD) 9XXXX-XXXX" required />
               {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="plan">Plano</Label>
               <Select value={plan} onValueChange={handlePlanChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o plano" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione o plano" /></SelectTrigger>
                 <SelectContent>
-                  {plans?.map(p => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                  ))}
+                  {plans?.map(p => (<SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -174,13 +161,9 @@ export function AddClientDialog() {
             <div className="space-y-2">
               <Label htmlFor="servidor">Servidor</Label>
               <Select value={servidor} onValueChange={setServidor}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o servidor" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione o servidor" /></SelectTrigger>
                 <SelectContent>
-                  {servers?.map(s => (
-                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-                  ))}
+                  {servers?.map(s => (<SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -191,52 +174,36 @@ export function AddClientDialog() {
             <div className="space-y-2">
               <Label htmlFor="aplicativo">Aplicativo</Label>
               <Select value={aplicativo} onValueChange={setAplicativo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o aplicativo" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione o aplicativo" /></SelectTrigger>
                 <SelectContent>
-                  {apps?.map(a => (
-                    <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
-                  ))}
+                  {apps?.map(a => (<SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dispositivo">Dispositivo</Label>
               <Select value={dispositivo} onValueChange={setDispositivo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o dispositivo" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione o dispositivo" /></SelectTrigger>
                 <SelectContent>
-                  {devices?.map(d => (
-                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
-                  ))}
+                  {devices?.map(d => (<SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="formaPagamento">Forma de Pagamento</Label>
               <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a forma" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione a forma" /></SelectTrigger>
                 <SelectContent>
-                  {pagamentos?.map(p => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                  ))}
+                  {pagamentos?.map(p => (<SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="captacao">Captação</Label>
               <Select value={captacao} onValueChange={setCaptacao}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a captação" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione a captação" /></SelectTrigger>
                 <SelectContent>
-                  {captacoes?.map(c => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
+                  {captacoes?.map(c => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>

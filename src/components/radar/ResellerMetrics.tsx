@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useResellers } from "@/hooks/useResellers";
 import { useClients } from "@/hooks/useClients";
-import { useAuth } from "@/hooks/useAuth";
 import { Users, UserCheck, UserX, BarChart3, DollarSign, TrendingUp } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -13,9 +12,7 @@ interface ResellerMetricsProps {
 }
 
 export function ResellerMetrics({ mask }: ResellerMetricsProps) {
-  const { roles } = useAuth();
-  const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
-  const { data: resellers, isLoading } = useResellers(tenantId);
+  const { data: resellers, isLoading } = useResellers();
   const { data: clients } = useClients();
 
   const chartData = useMemo(() => {
@@ -87,7 +84,6 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
 
   return (
     <div className="space-y-6 p-4 md:p-6 overflow-auto">
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-lg border bg-card p-4 space-y-1">
@@ -100,64 +96,35 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Distribution Pie */}
         <div className="rounded-lg border bg-card p-4">
           <h3 className="text-sm font-semibold mb-4">Status dos Revendedores</h3>
           {chartData.statusDist.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie
-                  data={chartData.statusDist}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={90}
-                  paddingAngle={3}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {chartData.statusDist.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
+                <Pie data={chartData.statusDist} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                  {chartData.statusDist.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
                 </Pie>
                 <Tooltip formatter={(v: number) => [v, "Revendedores"]} />
               </PieChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-          )}
+          ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
         </div>
 
-        {/* Revenue per Reseller Pie */}
         <div className="rounded-lg border bg-card p-4">
           <h3 className="text-sm font-semibold mb-4">Receita por Revendedor</h3>
           {chartData.revenueDist.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie
-                  data={chartData.revenueDist}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${fmt(value)}`}
-                >
-                  {chartData.revenueDist.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
+                <Pie data={chartData.revenueDist} cx="50%" cy="50%" outerRadius={90} paddingAngle={2} dataKey="value" label={({ name, value }) => `${name}: ${fmt(value)}`}>
+                  {chartData.revenueDist.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
                 </Pie>
                 <Tooltip formatter={(v: number) => [fmt(v), "Receita"]} />
               </PieChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-          )}
+          ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
         </div>
 
-        {/* Clients per Reseller Bar */}
         <div className="rounded-lg border bg-card p-4 lg:col-span-2">
           <h3 className="text-sm font-semibold mb-4">Clientes e Receita por Revendedor</h3>
           {chartData.clientDist.length > 0 ? (
@@ -166,24 +133,16 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 88%)" />
                 <XAxis type="number" />
                 <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(v: number, name: string) => [
-                    name === "receita" ? fmt(v) : v,
-                    name === "receita" ? "Receita" : "Clientes",
-                  ]}
-                />
+                <Tooltip formatter={(v: number, name: string) => [name === "receita" ? fmt(v) : v, name === "receita" ? "Receita" : "Clientes"]} />
                 <Legend />
                 <Bar dataKey="clientes" fill="hsl(220, 70%, 50%)" name="Clientes" radius={[0, 4, 4, 0]} />
                 <Bar dataKey="receita" fill="hsl(142, 60%, 40%)" name="Receita (R$)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>
-          )}
+          ) : (<p className="text-sm text-muted-foreground text-center py-12">Sem dados</p>)}
         </div>
       </div>
 
-      {/* Reseller Table */}
       {resellers && resellers.length > 0 ? (
         <div className="rounded-lg border bg-card overflow-x-auto">
           <table className="w-full text-sm">
@@ -207,11 +166,7 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
                   <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{r.display_name}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        r.status === "active"
-                          ? "bg-status-active-bg text-status-active"
-                          : "bg-status-expired-bg text-status-expired"
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.status === "active" ? "bg-status-active-bg text-status-active" : "bg-status-expired-bg text-status-expired"}`}>
                         {r.status === "active" ? "Ativo" : "Suspenso"}
                       </span>
                     </td>
@@ -221,12 +176,7 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              usage >= 90 ? "bg-status-expired" : usage >= 70 ? "bg-status-today" : "bg-status-active"
-                            }`}
-                            style={{ width: `${Math.min(usage, 100)}%` }}
-                          />
+                          <div className={`h-full rounded-full ${usage >= 90 ? "bg-status-expired" : usage >= 70 ? "bg-status-today" : "bg-status-active"}`} style={{ width: `${Math.min(usage, 100)}%` }} />
                         </div>
                         <span className="text-xs font-mono text-muted-foreground w-8">{usage}%</span>
                       </div>
