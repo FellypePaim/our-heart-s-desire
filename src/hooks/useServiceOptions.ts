@@ -14,10 +14,22 @@ export interface ServiceOption {
   updated_at: string;
 }
 
+// Deduplicate: if user has a local override for the same name+category, hide the global one
+function deduplicateOptions(options: ServiceOption[], userId?: string): ServiceOption[] {
+  if (!userId) return options;
+  const localNames = new Set(
+    options.filter(o => !o.is_global && o.created_by === userId).map(o => `${o.category}::${o.name}`)
+  );
+  return options.filter(o => {
+    if (o.is_global && localNames.has(`${o.category}::${o.name}`)) return false;
+    return true;
+  });
+}
+
 export function useServiceOptions(category?: string) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["service_options", category],
+    queryKey: ["service_options", category, user?.id],
     queryFn: async () => {
       let query = supabase
         .from("service_options")
@@ -27,7 +39,7 @@ export function useServiceOptions(category?: string) {
       if (category) query = query.eq("category", category);
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as ServiceOption[];
+      return deduplicateOptions((data || []) as ServiceOption[], user?.id);
     },
     enabled: !!user,
   });
