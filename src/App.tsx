@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAudit from "./pages/admin/AdminAudit";
+import AdminServiceConfig from "./pages/admin/AdminServiceConfig";
 import ServiceConfig from "./pages/ServiceConfig";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ function ProtectedLayout() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/services" element={<AdminServiceConfig />} />
             <Route path="/admin/audit" element={<AdminAudit />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

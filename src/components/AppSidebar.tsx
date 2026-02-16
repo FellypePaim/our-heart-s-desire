@@ -38,6 +38,7 @@ export function AppSidebar() {
   const superAdminItems = [
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
+    { to: "/admin/services", label: "Serviços Globais", icon: Server },
     { to: "/admin/audit", label: "Log de Atividades", icon: Crown },
   ];
 
