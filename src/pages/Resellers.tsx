@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UserProfile {
   id: string;
@@ -34,6 +35,7 @@ const Resellers = () => {
   const tenantId = roles.find((r) => r.tenant_id && r.is_active)?.tenant_id;
   const { data: resellers, isLoading } = useResellers(tenantId);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [page, setPage] = useState(1);
 
   // Create reseller via edge function state
@@ -89,9 +91,11 @@ const Resellers = () => {
 
   if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
 
-  const filtered = resellers?.filter((r) =>
-    r.display_name.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  const filtered = resellers?.filter((r) => {
+    const matchesSearch = r.display_name.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || r.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }) || [];
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -231,9 +235,22 @@ const Resellers = () => {
         </Button>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar revendedores..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar revendedores..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
+        </div>
+        <Select value={statusFilter} onValueChange={(v: "all" | "active" | "suspended") => { setStatusFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-[160px]">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="suspended">Suspensos</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-lg border bg-card overflow-x-auto">
