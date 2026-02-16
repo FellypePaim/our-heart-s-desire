@@ -13,6 +13,7 @@ import {
 interface ClientMetricsProps {
   clients: Client[];
   isLoading: boolean;
+  mask?: (value: string | null | undefined, type: "phone" | "value" | "email" | "text") => string;
 }
 
 const STATUS_COLORS: Record<StatusKey, string> = {
@@ -37,7 +38,7 @@ const STATUS_LABELS: Record<StatusKey, string> = {
   expired: "Vencido",
 };
 
-export function ClientMetrics({ clients, isLoading }: ClientMetricsProps) {
+export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) {
   const metrics = useMemo(() => {
     if (!clients || clients.length === 0) {
       return {
@@ -150,6 +151,7 @@ export function ClientMetrics({ clients, isLoading }: ClientMetricsProps) {
 
   const formatValue = (value: number, format: string) => {
     if (format === "currency") {
+      if (mask) return mask(String(value), "value");
       return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
     }
     return value.toLocaleString("pt-BR");
@@ -258,7 +260,7 @@ export function ClientMetrics({ clients, isLoading }: ClientMetricsProps) {
               <div key={item.label} className="flex items-center justify-between py-2 border-b last:border-b-0">
                 <span className="text-sm text-muted-foreground">{item.label}</span>
                 <span className={`font-mono font-semibold ${item.color}`}>
-                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.value)}
+                  {mask ? mask(String(item.value), "value") : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.value)}
                 </span>
               </div>
             ))}

@@ -91,7 +91,7 @@ const Index = () => {
         </div>
 
         <TabsContent value="clients" className="flex-1 overflow-hidden flex flex-col mt-0">
-          <ClientMetrics clients={clients || []} isLoading={isLoading} />
+          <ClientMetrics clients={clients || []} isLoading={isLoading} mask={hidden ? mask : undefined} />
 
           {/* Kanban Board */}
           <div className="flex-1 overflow-x-auto p-4 md:p-6">
@@ -120,7 +120,7 @@ const Index = () => {
 
         {showResellerTab && (
           <TabsContent value="resellers" className="flex-1 overflow-auto mt-0">
-            <ResellerMetrics />
+            <ResellerMetrics mask={hidden ? mask : undefined} />
           </TabsContent>
         )}
       </Tabs>
