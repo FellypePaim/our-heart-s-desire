@@ -121,20 +121,20 @@ const Index = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="clients" className="flex-1 overflow-hidden flex flex-col mt-0">
+        <TabsContent value="clients" className="flex-1 overflow-auto mt-0">
           <ClientMetrics clients={clients || []} isLoading={isLoading} mask={hidden ? mask : undefined} />
           <div className="px-4 md:px-6 pt-2">
             <OperationalLimits />
           </div>
 
           {/* Kanban Board */}
-          <div className="flex-1 overflow-x-auto p-4 md:p-6">
+          <div className="overflow-x-auto p-4 md:p-6">
             {isLoading ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="flex items-center justify-center py-20 text-muted-foreground">
                 Carregando...
               </div>
             ) : (
-              <div className="flex gap-4 h-full">
+              <div className="flex gap-4">
                 {DASHBOARD_COLUMNS.map((key) => {
                   const statusConfig = allStatuses.find((s) => s.key === key)!;
                   return (
