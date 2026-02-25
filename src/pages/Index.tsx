@@ -13,7 +13,7 @@ import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
 import { RiskScore } from "@/components/radar/RiskScore";
 import { OperationalLimits } from "@/components/OperationalLimits";
-import { DailyTips } from "@/components/DailyTips";
+import { DailyTipsPopover } from "@/components/DailyTipsPopover";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp, ShieldAlert } from "lucide-react";
@@ -59,6 +59,7 @@ const Index = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <DailyTipsPopover clients={clients || []} />
             <NotificationBell clients={clients || []} onClientClick={setSelectedClient} />
             <Button
               variant="outline"
@@ -73,9 +74,6 @@ const Index = () => {
           </div>
         </div>
       </header>
-
-      {/* Daily Tips */}
-      <DailyTips clients={clients || []} />
 
       {/* Tabs */}
       <Tabs defaultValue="clients" className="flex-1 flex flex-col overflow-hidden">
