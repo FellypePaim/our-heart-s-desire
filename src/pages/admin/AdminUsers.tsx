@@ -108,6 +108,9 @@ const AdminUsers = () => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
+  // Plan data for status unification
+  const [planMap, setPlanMap] = useState<Map<string, { plan_type: string; plan_expires_at: string }>>(new Map());
+
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [roleModalUser, setRoleModalUser] = useState<{ userId: string; currentRole: string; roleId: string } | null>(null);
   const [selectedNewRole, setSelectedNewRole] = useState<string>("");
@@ -139,16 +142,22 @@ const AdminUsers = () => {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const fetchProfiles = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("get-user-profiles");
-        if (error) throw error;
-        setProfiles(data || []);
+        const [profilesRes, plansRes] = await Promise.all([
+          supabase.functions.invoke("get-user-profiles"),
+          supabase.from("profiles").select("user_id, plan_type, plan_expires_at"),
+        ]);
+        if (profilesRes.error) throw profilesRes.error;
+        setProfiles(profilesRes.data || []);
+        if (!plansRes.error && plansRes.data) {
+          setPlanMap(new Map(plansRes.data.map((p: any) => [p.user_id, p])));
+        }
       } catch (e: any) {
         console.error("Failed to fetch profiles:", e);
       }
     };
-    fetchProfiles();
+    fetchData();
   }, [isSuperAdmin]);
 
   const getUserName = useCallback((userId: string) => {
@@ -230,12 +239,13 @@ const AdminUsers = () => {
     user_id: string;
     role: string;
     is_active: boolean;
+    isPlanExpired: boolean;
     created_at: string;
     displayName: string;
     source: "role" | "client";
     clientPhone?: string | null;
     ownerName: string;
-    clientId?: string; // original client ID for detail dialog
+    clientId?: string;
     expirationDate?: string;
     plan?: string | null;
     valor?: number | null;
@@ -261,11 +271,14 @@ const AdminUsers = () => {
           const resellerRecord = resellers?.find((res) => res.owner_user_id === r.user_id);
           if (resellerRecord?.created_by) ownerName = getUserName(resellerRecord.created_by);
         }
+        const userPlan = planMap.get(r.user_id);
+        const isPlanExpired = userPlan ? new Date(userPlan.plan_expires_at).getTime() < Date.now() : false;
         rows.push({
           id: r.id,
           user_id: r.user_id,
           role: r.role,
           is_active: r.is_active,
+          isPlanExpired,
           created_at: r.created_at,
           displayName: getUserName(r.user_id),
           source: "role",
@@ -306,6 +319,7 @@ const AdminUsers = () => {
           user_id: c.user_id,
           role: "user",
           is_active: !c.is_suspended,
+          isPlanExpired: false,
           created_at: c.created_at,
           displayName: c.name,
           source: "client",
@@ -324,11 +338,11 @@ const AdminUsers = () => {
       if (key === "name") return item.displayName;
       if (key === "role") return roleLabels[item.role] || item.role;
       if (key === "owner") return item.ownerName;
-      if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
+      if (key === "status") return !item.is_active ? "Bloqueado" : item.isPlanExpired ? "Expirado" : "Ativo";
       if (key === "created_at") return item.created_at;
       return (item as any)[key];
     });
-  }, [roles, allClients, filterRole, filterOwner, ownerUserIds, ownerOptions, resellers, search, allSort.sortFn, getUserName]);
+  }, [roles, allClients, filterRole, filterOwner, ownerUserIds, ownerOptions, resellers, search, allSort.sortFn, getUserName, planMap]);
 
   const filterKey = `${search}|${filterRole}|${filterOwner}`;
   useEffect(() => { setPage(1); }, [filterKey]);
@@ -356,7 +370,7 @@ const AdminUsers = () => {
       if (cols.nome) row.push(r.displayName);
       if (cols.cargo) row.push(roleLabels[r.role] || r.role);
       if (cols.proprietario) row.push(r.ownerName);
-      if (cols.status) row.push(r.is_active ? "Ativo" : "Bloqueado");
+      if (cols.status) row.push(!r.is_active ? "Bloqueado" : r.isPlanExpired ? "Expirado" : "Ativo");
       if (cols.whatsapp) row.push(r.clientPhone || "");
       if (cols.vencimento) row.push(r.expirationDate ? format(new Date(r.expirationDate + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "");
       if (cols.plano) row.push(r.plan || "");
@@ -685,8 +699,12 @@ const AdminUsers = () => {
                       {hidden ? "••••••••" : r.ownerName}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={r.is_active ? "default" : "destructive"}>
-                        {r.is_active ? "Ativo" : (r.source === "client" ? "Suspenso" : "Bloqueado")}
+                      <Badge variant={!r.is_active || r.isPlanExpired ? "destructive" : "default"}>
+                        {!r.is_active
+                          ? (r.source === "client" ? "Suspenso" : "Bloqueado")
+                          : r.isPlanExpired
+                            ? "Expirado"
+                            : "Ativo"}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
