@@ -87,7 +87,10 @@ const AdminPlans = () => {
 
         if (role === "super_admin") continue; // Don't show super admins
 
-        const expiresAt = plan?.plan_expires_at || new Date().toISOString();
+        const expiresAt = plan?.plan_expires_at;
+        // Skip users without a profile/plan — they have no plan data to show
+        if (!expiresAt) continue;
+
         result.push({
           userId: uid,
           email: profile?.email || "—",
