@@ -131,7 +131,8 @@ export function DailyTips({ clients }: DailyTipsProps) {
         {tips.map((tip, i) => (
           <div
             key={i}
-            className="flex gap-3 items-start rounded-lg bg-muted/50 p-3"
+            className="flex gap-3 items-start rounded-lg bg-muted/50 p-3 animate-fade-in"
+            style={{ animationDelay: `${i * 150}ms`, animationFillMode: "backwards" }}
           >
             <span className="text-lg shrink-0">{tip.emoji}</span>
             <p className="text-sm text-muted-foreground leading-relaxed">{tip.text}</p>
