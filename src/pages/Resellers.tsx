@@ -5,7 +5,8 @@ import { useClients } from "@/hooks/useClients";
 import { Navigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { format } from "date-fns";
+import { format, isPast, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +77,7 @@ const Resellers = () => {
   const [renewSaving, setRenewSaving] = useState(false);
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [planMap, setPlanMap] = useState<Map<string, { plan_type: string; plan_expires_at: string }>>(new Map());
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
   const { toast } = useToast();
@@ -92,7 +94,19 @@ const Resellers = () => {
         console.error("Failed to fetch profiles:", e);
       }
     };
+    const fetchPlans = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("user_id, plan_type, plan_expires_at");
+        if (error) throw error;
+        setPlanMap(new Map((data || []).map((p: any) => [p.user_id, p])));
+      } catch (e: any) {
+        console.error("Failed to fetch plans:", e);
+      }
+    };
     fetchProfiles();
+    fetchPlans();
   }, []);
 
   const getCreatorName = (createdBy: string | null) => {
@@ -105,6 +119,8 @@ const Resellers = () => {
   if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
 
   const filtered = resellers?.filter((r) => {
+    // SuperAdmin only sees their own resellers here (use Admin > Users for global view)
+    if (isSuperAdmin && r.created_by !== user?.id) return false;
     const matchesSearch = r.display_name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -360,17 +376,22 @@ const Resellers = () => {
               <TableHead>Status</TableHead>
               <TableHead>Clientes</TableHead>
               <TableHead className="hidden md:table-cell">Limite</TableHead>
+              <TableHead>Vencimento</TableHead>
               <TableHead className="hidden md:table-cell">#Criador</TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : paged.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum revendedor encontrado</TableCell></TableRow>
             ) : (
-              paged.map((r) => (
+              paged.map((r) => {
+                const plan = planMap.get(r.owner_user_id);
+                const expiresAt = plan?.plan_expires_at ? new Date(plan.plan_expires_at) : null;
+                const expired = expiresAt ? isPast(expiresAt) : true;
+                return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.display_name}</TableCell>
                   <TableCell>
@@ -381,6 +402,22 @@ const Resellers = () => {
                   <TableCell className="font-mono">{r.client_count || 0}</TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground font-mono">
                     {r.limits?.max_clients || "∞"} clientes / {r.limits?.max_messages_month || "∞"} msg
+                  </TableCell>
+                  <TableCell>
+                    {expiresAt ? (
+                      <div className="text-sm">
+                        <Badge variant={expired ? "destructive" : "outline"} className="text-xs">
+                          {format(expiresAt, "dd/MM/yyyy", { locale: ptBR })}
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {expired
+                            ? `Expirou ${formatDistanceToNow(expiresAt, { locale: ptBR, addSuffix: true })}`
+                            : `Expira ${formatDistanceToNow(expiresAt, { locale: ptBR, addSuffix: true })}`}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                     {getCreatorName(r.created_by)}
@@ -411,7 +448,8 @@ const Resellers = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -558,6 +596,9 @@ const Resellers = () => {
                   if (error) throw error;
                   await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { days: 30 });
                   toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado por +30 dias.` });
+                  // Refresh plan data
+                  const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
+                  if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
                   setRenewOpen(false);
                 } catch (e: any) {
                   toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -590,6 +631,8 @@ const Resellers = () => {
                     if (error) throw error;
                     await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { date: renewDate });
                     toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado até ${renewDate}.` });
+                    const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
+                    if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
                     setRenewOpen(false);
                   } catch (e: any) {
                     toast({ title: "Erro", description: e.message, variant: "destructive" });
