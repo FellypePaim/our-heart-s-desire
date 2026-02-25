@@ -15,13 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2, Plus, SlidersHorizontal } from "lucide-react";
+import { ClientDetailDialog } from "@/components/ClientDetailDialog";
+import { Client } from "@/lib/supabase-types";
+import { Shield, Search, Ban, CheckCircle, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Download, UserCog, Trash2, Plus, SlidersHorizontal, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -89,6 +92,18 @@ const AdminUsers = () => {
   const [page, setPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Selection state for export
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportColumns, setExportColumns] = useState({
+    nome: true, cargo: true, proprietario: true, status: true, data: true,
+    whatsapp: false, vencimento: false, plano: false, valor: false, servidor: false,
+  });
+
+  // Client detail dialog state
+  const [detailClient, setDetailClient] = useState<Client | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
@@ -206,6 +221,11 @@ const AdminUsers = () => {
     source: "role" | "client";
     clientPhone?: string | null;
     ownerName: string;
+    clientId?: string; // original client ID for detail dialog
+    expirationDate?: string;
+    plan?: string | null;
+    valor?: number | null;
+    servidor?: string | null;
   };
 
   const filteredRoles = useMemo(() => {
@@ -276,6 +296,11 @@ const AdminUsers = () => {
           source: "client",
           clientPhone: c.phone,
           ownerName,
+          clientId: c.id,
+          expirationDate: c.expiration_date,
+          plan: c.plan,
+          valor: c.valor,
+          servidor: c.servidor,
         });
       });
     }
@@ -294,14 +319,40 @@ const AdminUsers = () => {
   useEffect(() => { setPage(1); }, [filterKey]);
 
   const exportCSV = useCallback(() => {
-    const headers = ["Nome", "Cargo", "Status", "Data"];
-    const rows = filteredRoles.map(r => [
-      getUserName(r.user_id), roleLabels[r.role] || r.role,
-      r.is_active ? "Ativo" : "Bloqueado",
-      format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR })
-    ]);
+    const rowsToExport = selectedIds.size > 0
+      ? filteredRoles.filter((r) => selectedIds.has(r.id))
+      : filteredRoles;
+
+    const cols = exportColumns;
+    const headers: string[] = [];
+    if (cols.nome) headers.push("Nome");
+    if (cols.cargo) headers.push("Cargo");
+    if (cols.proprietario) headers.push("Proprietário");
+    if (cols.status) headers.push("Status");
+    if (cols.whatsapp) headers.push("WhatsApp");
+    if (cols.vencimento) headers.push("Vencimento");
+    if (cols.plano) headers.push("Plano");
+    if (cols.valor) headers.push("Valor");
+    if (cols.servidor) headers.push("Servidor");
+    if (cols.data) headers.push("Data Cadastro");
+
+    const csvRows = rowsToExport.map((r) => {
+      const row: string[] = [];
+      if (cols.nome) row.push(r.displayName);
+      if (cols.cargo) row.push(roleLabels[r.role] || r.role);
+      if (cols.proprietario) row.push(r.ownerName);
+      if (cols.status) row.push(r.is_active ? "Ativo" : "Bloqueado");
+      if (cols.whatsapp) row.push(r.clientPhone || "");
+      if (cols.vencimento) row.push(r.expirationDate ? format(new Date(r.expirationDate + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR }) : "");
+      if (cols.plano) row.push(r.plan || "");
+      if (cols.valor) row.push(r.valor != null ? String(r.valor) : "");
+      if (cols.servidor) row.push(r.servidor || "");
+      if (cols.data) row.push(format(new Date(r.created_at), "dd/MM/yyyy", { locale: ptBR }));
+      return row;
+    });
+
     const bom = "\uFEFF";
-    const csv = bom + [headers.join(";"), ...rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(";"))].join("\n");
+    const csv = bom + [headers.join(";"), ...csvRows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(";"))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -309,8 +360,34 @@ const AdminUsers = () => {
     a.download = "usuarios.csv";
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Exportado!", description: "Arquivo CSV gerado com sucesso." });
-  }, [filteredRoles, toast, getUserName]);
+    toast({ title: "Exportado!", description: `${rowsToExport.length} registros exportados.` });
+    setExportModalOpen(false);
+  }, [filteredRoles, selectedIds, exportColumns, toast]);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredRoles.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRoles.map((r) => r.id)));
+    }
+  }, [filteredRoles, selectedIds]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const openClientDetail = useCallback((clientId: string) => {
+    const client = allClients?.find((c) => c.id === clientId);
+    if (client) {
+      setDetailClient(client as Client);
+      setDetailOpen(true);
+    }
+  }, [allClients]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRoles.length / ITEMS_PER_PAGE));
   const pagedRoles = filteredRoles.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -531,15 +608,29 @@ const AdminUsers = () => {
         <Button variant="outline" size="icon" onClick={togglePrivacy} title={hidden ? "Mostrar" : "Ocultar"} className="h-9 w-9">
           {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
-        <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
+        <Button variant="outline" size="sm" onClick={() => setExportModalOpen(true)} className="gap-2">
           <Download className="h-4 w-4" /> Exportar CSV
+          {selectedIds.size > 0 && <Badge variant="secondary" className="ml-1">{selectedIds.size}</Badge>}
         </Button>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span>{selectedIds.size} selecionado(s)</span>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Limpar seleção</Button>
+        </div>
+      )}
 
       <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={filteredRoles.length > 0 && selectedIds.size === filteredRoles.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <SortableHead label="Nome" sortKey="name" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Cargo" sortKey="role" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Proprietário" sortKey="owner" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
@@ -550,14 +641,20 @@ const AdminUsers = () => {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : filteredRoles.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
             ) : (
               pagedRoles.map((r) => {
                 const canAct = r.source === "role" && canActOn(r.role);
                 return (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} data-state={selectedIds.has(r.id) ? "selected" : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(r.id)}
+                        onCheckedChange={() => toggleSelect(r.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{hidden ? "••••••••" : r.displayName}</TableCell>
                     <TableCell>
                       <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
@@ -577,6 +674,11 @@ const AdminUsers = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {r.source === "client" && r.clientId && (
+                          <Button variant="ghost" size="icon" onClick={() => openClientDetail(r.clientId!)} title="Ver detalhes">
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        )}
                         {canAct && (
                           <>
                             <Button variant="ghost" size="icon" onClick={() => openRoleModal(r.user_id, r.role, r.id)} title="Alterar cargo">
@@ -594,9 +696,6 @@ const AdminUsers = () => {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </>
-                        )}
-                        {r.source === "client" && (
-                          <span className="text-xs text-muted-foreground italic flex items-center">Registro de cliente</span>
                         )}
                       </div>
                     </TableCell>
@@ -775,6 +874,66 @@ const AdminUsers = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export Modal */}
+      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Download className="h-5 w-5" /> Exportar CSV</DialogTitle>
+            <DialogDescription>
+              {selectedIds.size > 0
+                ? `${selectedIds.size} usuário(s) selecionado(s) para exportação`
+                : `Todos os ${filteredRoles.length} usuários filtrados serão exportados`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <p className="text-sm font-medium mb-3">Colunas para exportar:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["nome", "Nome"],
+                  ["cargo", "Cargo"],
+                  ["proprietario", "Proprietário"],
+                  ["status", "Status"],
+                  ["data", "Data Cadastro"],
+                  ["whatsapp", "WhatsApp"],
+                  ["vencimento", "Vencimento"],
+                  ["plano", "Plano"],
+                  ["valor", "Valor"],
+                  ["servidor", "Servidor"],
+                ] as [keyof typeof exportColumns, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={exportColumns[key]}
+                      onCheckedChange={(checked) => setExportColumns((prev) => ({ ...prev, [key]: !!checked }))}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportModalOpen(false)}>Cancelar</Button>
+            <Button onClick={exportCSV} disabled={!Object.values(exportColumns).some(Boolean)}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar {selectedIds.size > 0 ? `(${selectedIds.size})` : `(${filteredRoles.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Client Detail Dialog */}
+      <ClientDetailDialog
+        client={detailClient}
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["all_clients"] });
+          }
+        }}
+      />
     </div>
   );
 };
