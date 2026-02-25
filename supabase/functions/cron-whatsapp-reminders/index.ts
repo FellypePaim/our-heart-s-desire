@@ -60,16 +60,19 @@ Deno.serve(async (req) => {
 
       if (!clients) continue;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Parse today in São Paulo timezone to avoid UTC date shift
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const [tY, tM, tD] = todayStr.split('-').map(Number);
+      const today = new Date(tY, tM - 1, tD);
 
       for (const client of clients) {
         if (!client.phone) continue;
-        const expDate = new Date(client.expiration_date);
-        expDate.setHours(0, 0, 0, 0);
+        // Parse expiration_date as local date (YYYY-MM-DD) to avoid UTC offset
+        const [eY, eM, eD] = client.expiration_date.split('-').map(Number);
+        const expDate = new Date(eY, eM - 1, eD);
 
         const diffTime = expDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
         let statusKey = "";
         if (diffDays === 3) statusKey = "vence_3_dias";
@@ -78,9 +81,11 @@ Deno.serve(async (req) => {
 
         if (statusKey && tplMap[statusKey]) {
           let text = tplMap[statusKey];
+          // Format expiration date as dd/MM/yyyy
+          const formattedDate = `${String(eD).padStart(2, '0')}/${String(eM).padStart(2, '0')}/${eY}`;
           text = text.replace(/\{nome\}/g, client.name)
             .replace(/\{plano\}/g, client.plan || "")
-            .replace(/\{vencimento\}/g, new Date(client.expiration_date).toLocaleDateString('pt-BR'));
+            .replace(/\{vencimento\}/g, formattedDate);
 
           const phoneFormat = client.phone.replace(/\D/g, ""); // keep only numbers
 
