@@ -134,7 +134,7 @@ export function AppSidebar() {
         {panelItems.map(renderNavItem)}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3 pb-8 space-y-2">
+      <div className="border-t border-sidebar-border p-3 pb-[env(safe-area-inset-bottom,8px)] space-y-2" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 8px), 1rem)' }}>
         <p className="truncate px-3 text-xs text-sidebar-foreground/50">
           {user?.email}
         </p>
@@ -178,8 +178,8 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground shrink-0 transition-transform z-50",
-          "fixed lg:sticky lg:top-0",
+          "flex w-64 flex-col border-r bg-sidebar text-sidebar-foreground shrink-0 transition-transform z-50",
+          "fixed lg:sticky lg:top-0 h-[100dvh]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
