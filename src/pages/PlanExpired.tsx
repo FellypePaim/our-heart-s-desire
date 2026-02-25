@@ -2,7 +2,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePlanStatus } from "@/hooks/usePlanStatus";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Crown, MessageCircle, LogOut } from "lucide-react";
+import { AlertTriangle, Crown, MessageCircle, LogOut, RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 const WHATSAPP_NUMBER = "5537991237543";
 const WHATSAPP_MESSAGE = encodeURIComponent(
@@ -11,7 +13,16 @@ const WHATSAPP_MESSAGE = encodeURIComponent(
 
 const PlanExpired = () => {
   const { user, signOut, isSuperAdmin } = useAuth();
-  const { data: plan, isLoading } = usePlanStatus();
+  const { data: plan, isLoading, refetch } = usePlanStatus();
+  const queryClient = useQueryClient();
+  const [checking, setChecking] = useState(false);
+
+  const handleRecheck = async () => {
+    setChecking(true);
+    await queryClient.invalidateQueries({ queryKey: ["plan-status"] });
+    await refetch();
+    setChecking(false);
+  };
 
   // SuperAdmins never see this page
   if (isSuperAdmin) return <Navigate to="/" replace />;
@@ -80,6 +91,11 @@ const PlanExpired = () => {
             Entre em contato com seu administrador para solicitar a renovação.
           </p>
         )}
+
+        <Button variant="outline" onClick={handleRecheck} disabled={checking} className="w-full gap-2">
+          <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
+          {checking ? "Verificando..." : "Verificar novamente"}
+        </Button>
 
         <Button variant="outline" onClick={signOut} className="w-full gap-2">
           <LogOut className="h-4 w-4" />
