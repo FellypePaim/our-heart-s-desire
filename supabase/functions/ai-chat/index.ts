@@ -69,16 +69,39 @@ serve(async (req) => {
     // Fetch user's clients (RLS will scope to their own data)
     const { data: clients } = await supabase
       .from("clients")
-      .select("name, expiration_date, plan, servidor, aplicativo, valor, is_suspended")
+      .select("name, expiration_date, plan, servidor, aplicativo, valor, is_suspended, forma_pagamento, telas")
       .limit(500);
 
     // Build user context summary
     const totalClients = clients?.length ?? 0;
     const now = new Date();
-    const active = clients?.filter((c) => !c.is_suspended && new Date(c.expiration_date) >= now).length ?? 0;
-    const expired = clients?.filter((c) => new Date(c.expiration_date) < now).length ?? 0;
+    const today = now.toISOString().split("T")[0];
+
+    const active = clients?.filter((c) => !c.is_suspended && c.expiration_date >= today).length ?? 0;
+    const expired = clients?.filter((c) => c.expiration_date < today && !c.is_suspended).length ?? 0;
     const suspended = clients?.filter((c) => c.is_suspended).length ?? 0;
     const totalRevenue = clients?.reduce((sum, c) => sum + (c.valor ?? 0), 0) ?? 0;
+
+    // Clients expiring in the next 3 days
+    const in3Days = new Date(now);
+    in3Days.setDate(in3Days.getDate() + 3);
+    const in3DaysStr = in3Days.toISOString().split("T")[0];
+    const expiringClients = clients
+      ?.filter((c) => !c.is_suspended && c.expiration_date >= today && c.expiration_date <= in3DaysStr)
+      .map((c) => `  • ${c.name} — vence ${c.expiration_date} (${c.plan ?? "sem plano"})`) ?? [];
+
+    // Clients already expired (last 7 days)
+    const minus7 = new Date(now);
+    minus7.setDate(minus7.getDate() - 7);
+    const minus7Str = minus7.toISOString().split("T")[0];
+    const recentlyExpired = clients
+      ?.filter((c) => !c.is_suspended && c.expiration_date < today && c.expiration_date >= minus7Str)
+      .map((c) => `  • ${c.name} — venceu ${c.expiration_date}`) ?? [];
+
+    // Revenue at risk (expiring soon)
+    const revenueAtRisk = clients
+      ?.filter((c) => !c.is_suspended && c.expiration_date >= today && c.expiration_date <= in3DaysStr)
+      .reduce((sum, c) => sum + (c.valor ?? 0), 0) ?? 0;
 
     const userContext = `
 DADOS DO USUÁRIO (somente dele):
@@ -87,9 +110,12 @@ DADOS DO USUÁRIO (somente dele):
 - Vencidos: ${expired}
 - Suspensos: ${suspended}
 - Receita mensal estimada: R$ ${totalRevenue.toFixed(2)}
-${totalClients > 0 ? `- Planos mais usados: ${[...new Set(clients?.map((c) => c.plan).filter(Boolean))].join(", ")}` : ""}
+- Receita em risco (vencendo em 3 dias): R$ ${revenueAtRisk.toFixed(2)}
+${totalClients > 0 ? `- Planos: ${[...new Set(clients?.map((c) => c.plan).filter(Boolean))].join(", ")}` : ""}
 ${totalClients > 0 ? `- Servidores: ${[...new Set(clients?.map((c) => c.servidor).filter(Boolean))].join(", ")}` : ""}
-${totalClients > 0 ? `- Apps: ${[...new Set(clients?.map((c) => c.aplicativo).filter(Boolean))].join(", ")}` : ""}`;
+${totalClients > 0 ? `- Apps: ${[...new Set(clients?.map((c) => c.aplicativo).filter(Boolean))].join(", ")}` : ""}
+${expiringClients.length > 0 ? `\nCLIENTES VENCENDO NOS PRÓXIMOS 3 DIAS:\n${expiringClients.join("\n")}` : "\nNenhum cliente vencendo nos próximos 3 dias."}
+${recentlyExpired.length > 0 ? `\nCLIENTES QUE VENCERAM NOS ÚLTIMOS 7 DIAS:\n${recentlyExpired.join("\n")}` : ""}`;
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n" + userContext;
 
