@@ -79,8 +79,8 @@ const Index = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="clients" className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b px-4 md:px-6">
-          <TabsList className="h-10 bg-transparent p-0 gap-4">
+        <div className="border-b px-4 md:px-6 overflow-x-auto">
+          <TabsList className="h-10 bg-transparent p-0 gap-4 w-max">
             <TabsTrigger
               value="clients"
               className="relative h-10 rounded-none border-b-2 border-transparent px-1 pb-3 pt-2 font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent gap-2"
