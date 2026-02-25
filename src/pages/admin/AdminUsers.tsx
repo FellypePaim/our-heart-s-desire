@@ -195,25 +195,84 @@ const AdminUsers = () => {
     return ids;
   }, [filterOwner, ownerOptions, resellers, allClients]);
 
+  // Unified row type for both user_roles and clients
+  type UnifiedRow = {
+    id: string;
+    user_id: string;
+    role: string;
+    is_active: boolean;
+    created_at: string;
+    displayName: string;
+    source: "role" | "client";
+    clientPhone?: string | null;
+  };
+
   const filteredRoles = useMemo(() => {
-    const list = roles?.filter((r) => {
-      if (filterRole !== "all" && r.role !== filterRole) return false;
-      if (ownerUserIds && !ownerUserIds.has(r.user_id)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const name = getUserName(r.user_id).toLowerCase();
-        if (!name.includes(q) && !r.user_id.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    }) || [];
-    return allSort.sortFn(list, (item, key) => {
-      if (key === "name") return getUserName(item.user_id);
+    const rows: UnifiedRow[] = [];
+
+    // Add user_roles entries (exclude "user" filter since those come from clients)
+    if (filterRole !== "user") {
+      (roles || []).forEach((r) => {
+        if (filterRole !== "all" && r.role !== filterRole) return;
+        if (ownerUserIds && !ownerUserIds.has(r.user_id)) return;
+        if (search) {
+          const q = search.toLowerCase();
+          const name = getUserName(r.user_id).toLowerCase();
+          if (!name.includes(q) && !r.user_id.toLowerCase().includes(q)) return;
+        }
+        rows.push({
+          id: r.id,
+          user_id: r.user_id,
+          role: r.role,
+          is_active: r.is_active,
+          created_at: r.created_at,
+          displayName: getUserName(r.user_id),
+          source: "role",
+        });
+      });
+    }
+
+    // Add clients as "Cliente Final" rows
+    if (filterRole === "all" || filterRole === "user") {
+      (allClients || []).forEach((c) => {
+        // Owner filter: match client's user_id (direct owner) or reseller's owner
+        if (ownerUserIds) {
+          const ownerOption = ownerOptions.find((o) => o.id === filterOwner);
+          let matches = false;
+          if (c.user_id === filterOwner) matches = true;
+          if (c.reseller_id) {
+            const resellerRecord = resellers?.find((r) => r.id === c.reseller_id);
+            if (resellerRecord && resellerRecord.owner_user_id === filterOwner) matches = true;
+            // If filtering by master, also include clients of resellers created by that master
+            if (ownerOption?.type === "master" && resellerRecord && resellerRecord.created_by === filterOwner) matches = true;
+          }
+          if (!matches) return;
+        }
+        if (search) {
+          const q = search.toLowerCase();
+          if (!c.name.toLowerCase().includes(q) && !(c.phone || "").toLowerCase().includes(q)) return;
+        }
+        rows.push({
+          id: `client_${c.id}`,
+          user_id: c.user_id,
+          role: "user",
+          is_active: !c.is_suspended,
+          created_at: c.created_at,
+          displayName: c.name,
+          source: "client",
+          clientPhone: c.phone,
+        });
+      });
+    }
+
+    return allSort.sortFn(rows, (item, key) => {
+      if (key === "name") return item.displayName;
       if (key === "role") return roleLabels[item.role] || item.role;
       if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
       if (key === "created_at") return item.created_at;
       return (item as any)[key];
     });
-  }, [roles, filterRole, filterOwner, ownerUserIds, search, allSort.sortFn, getUserName]);
+  }, [roles, allClients, filterRole, filterOwner, ownerUserIds, ownerOptions, resellers, search, allSort.sortFn, getUserName]);
 
   const filterKey = `${search}|${filterRole}|${filterOwner}`;
   useEffect(() => { setPage(1); }, [filterKey]);
@@ -479,10 +538,10 @@ const AdminUsers = () => {
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
             ) : (
               pagedRoles.map((r) => {
-                const canAct = canActOn(r.role);
+                const canAct = r.source === "role" && canActOn(r.role);
                 return (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{hidden ? "••••••••" : getUserName(r.user_id)}</TableCell>
+                    <TableCell className="font-medium">{hidden ? "••••••••" : r.displayName}</TableCell>
                     <TableCell>
                       <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                         {roleLabels[r.role] || r.role}
@@ -490,7 +549,7 @@ const AdminUsers = () => {
                     </TableCell>
                     <TableCell>
                       <Badge variant={r.is_active ? "default" : "destructive"}>
-                        {r.is_active ? "Ativo" : "Bloqueado"}
+                        {r.is_active ? "Ativo" : (r.source === "client" ? "Suspenso" : "Bloqueado")}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
@@ -515,6 +574,9 @@ const AdminUsers = () => {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </>
+                        )}
+                        {r.source === "client" && (
+                          <span className="text-xs text-muted-foreground italic flex items-center">Registro de cliente</span>
                         )}
                       </div>
                     </TableCell>
