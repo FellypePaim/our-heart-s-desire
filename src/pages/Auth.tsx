@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound, ShieldCheck, Store } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound, ShieldCheck, Store, User } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 
 const Auth = () => {
@@ -13,6 +13,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"panel_admin" | "reseller">("panel_admin");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -39,7 +40,7 @@ const Auth = () => {
           email,
           password,
           options: {
-            data: { selected_role: selectedRole },
+            data: { selected_role: selectedRole, full_name: fullName.trim() || email.split("@")[0] },
           },
         });
         if (error) throw error;
@@ -184,6 +185,26 @@ const Auth = () => {
                       Gerencie clientes
                     </span>
                   </button>
+                </div>
+              </div>
+            )}
+
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Nome completo
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Seu nome"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="pl-10 h-11"
+                  />
                 </div>
               </div>
             )}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,22 +49,32 @@ function RequireRole({ roles: allowedRoles, children }: { roles: string[]; child
 
 function ProtectedLayout() {
   const { session, loading, user, roles } = useAuth();
+  const [settingUp, setSettingUp] = useState(false);
 
   // On first login after email confirmation, setup role if missing
   useEffect(() => {
     if (!user || roles.length > 0) return;
     const selectedRole = user.user_metadata?.selected_role;
     if (selectedRole && (selectedRole === "panel_admin" || selectedRole === "reseller")) {
+      setSettingUp(true);
       supabase.functions.invoke("self-register", {
         body: { role: selectedRole },
-      }).catch((err) => console.error("Self-register error:", err));
+      }).then(() => {
+        // Force reload to pick up new role and profile
+        window.location.reload();
+      }).catch((err) => {
+        console.error("Self-register error:", err);
+        setSettingUp(false);
+      });
     }
   }, [user, roles]);
 
-  if (loading) {
+  if (loading || settingUp) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        <div className="animate-pulse text-muted-foreground">
+          {settingUp ? "Configurando sua conta..." : "Carregando..."}
+        </div>
       </div>
     );
   }
