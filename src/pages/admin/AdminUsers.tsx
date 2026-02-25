@@ -670,7 +670,12 @@ const AdminUsers = () => {
                         onCheckedChange={() => toggleSelect(r.id)}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{hidden ? "••••••••" : r.displayName}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>{hidden ? "••••••••" : r.displayName}</div>
+                      {!hidden && r.source === "role" && profileMap.get(r.user_id)?.email && (
+                        <span className="text-xs text-muted-foreground">{profileMap.get(r.user_id)?.email}</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                         {roleLabels[r.role] || r.role}
