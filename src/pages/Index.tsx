@@ -11,11 +11,12 @@ import { ClientMetrics } from "@/components/radar/ClientMetrics";
 import { ResellerMetrics } from "@/components/radar/ResellerMetrics";
 import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
+import { RiskScore } from "@/components/radar/RiskScore";
 import { OperationalLimits } from "@/components/OperationalLimits";
 import { DailyTips } from "@/components/DailyTips";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
+import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp, ShieldAlert } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const Index = () => {
@@ -101,6 +102,13 @@ const Index = () => {
               <TrendingUp className="h-4 w-4" />
               Previsão de Receita
             </TabsTrigger>
+            <TabsTrigger
+              value="risk"
+              className="relative h-10 rounded-none border-b-2 border-transparent px-1 pb-3 pt-2 font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent gap-2"
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Score de Risco
+            </TabsTrigger>
             {showResellerTab && (
               <TabsTrigger
                 value="resellers"
@@ -150,6 +158,10 @@ const Index = () => {
 
         <TabsContent value="forecast" className="flex-1 overflow-auto mt-0 p-4 md:p-6">
           <RevenueForecast clients={clients || []} mask={hidden ? mask : undefined} />
+        </TabsContent>
+
+        <TabsContent value="risk" className="flex-1 overflow-auto mt-0 p-4 md:p-6">
+          <RiskScore clients={clients || []} onClientClick={setSelectedClient} mask={hidden ? mask : undefined} />
         </TabsContent>
 
         {showResellerTab && (
