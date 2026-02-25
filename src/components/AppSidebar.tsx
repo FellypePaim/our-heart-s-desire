@@ -176,9 +176,9 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "flex h-full w-64 flex-col border-r bg-sidebar text-sidebar-foreground shrink-0 transition-transform z-50",
-          "fixed lg:static lg:h-auto lg:max-h-full",
-          mobileOpen ? "translate-x-0 h-screen" : "-translate-x-full lg:translate-x-0"
+          "flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground shrink-0 transition-transform z-50",
+          "fixed lg:sticky lg:top-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {sidebarContent}
