@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { PlanExpiredGuard } from "@/components/PlanExpiredGuard";
+import { Progress } from "@/components/ui/progress";
 import { TrialWelcomeModal } from "@/components/TrialWelcomeModal";
 import { AIChatWidget } from "@/components/AIChatWidget";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
@@ -50,20 +51,38 @@ function RequireRole({ roles: allowedRoles, children }: { roles: string[]; child
 function ProtectedLayout() {
   const { session, loading, user, roles } = useAuth();
   const [settingUp, setSettingUp] = useState(false);
+  const [setupProgress, setSetupProgress] = useState(0);
 
   // On first login after email confirmation, setup role if missing
   useEffect(() => {
     if (!user || roles.length > 0) return;
+    // Prevent infinite reload loop
+    const alreadyCalled = sessionStorage.getItem(`self-register-${user.id}`);
+    if (alreadyCalled) return;
+
     const selectedRole = user.user_metadata?.selected_role;
     if (selectedRole && (selectedRole === "panel_admin" || selectedRole === "reseller")) {
       setSettingUp(true);
+      sessionStorage.setItem(`self-register-${user.id}`, "true");
+
+      // Animate progress
+      const interval = setInterval(() => {
+        setSetupProgress((prev) => Math.min(prev + Math.random() * 15, 90));
+      }, 400);
+
       supabase.functions.invoke("self-register", {
         body: { role: selectedRole },
       }).then(() => {
-        // Force reload to pick up new role and profile
-        window.location.reload();
+        clearInterval(interval);
+        setSetupProgress(100);
+        setTimeout(() => {
+          sessionStorage.removeItem(`self-register-${user.id}`);
+          window.location.reload();
+        }, 600);
       }).catch((err) => {
+        clearInterval(interval);
         console.error("Self-register error:", err);
+        sessionStorage.removeItem(`self-register-${user.id}`);
         setSettingUp(false);
       });
     }
@@ -71,9 +90,29 @@ function ProtectedLayout() {
 
   if (loading || settingUp) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">
-          {settingUp ? "Configurando sua conta..." : "Carregando..."}
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-6 animate-fade-in max-w-sm text-center px-6">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full border-[3px] border-primary border-t-transparent animate-spin" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold text-foreground">
+              {settingUp ? "Preparando tudo para você..." : "Carregando..."}
+            </h2>
+            {settingUp && (
+              <p className="text-sm text-muted-foreground">
+                Estamos configurando seu painel. Isso levará apenas alguns segundos.
+              </p>
+            )}
+          </div>
+          {settingUp && (
+            <div className="w-full space-y-2">
+              <Progress value={setupProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground">{Math.round(setupProgress)}%</p>
+            </div>
+          )}
         </div>
       </div>
     );
