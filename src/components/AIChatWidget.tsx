@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bot, Send, X, Sparkles, Shield, Crown, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -199,13 +200,19 @@ export function AIChatWidget() {
               <div
                 key={i}
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap",
+                  "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
                   m.role === "user"
-                    ? "ml-auto bg-primary text-primary-foreground rounded-br-md"
+                    ? "ml-auto bg-primary text-primary-foreground rounded-br-md whitespace-pre-wrap"
                     : "bg-muted text-foreground rounded-bl-md"
                 )}
               >
-                {m.content}
+                {m.role === "assistant" ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-background/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-background/50 [&_pre]:p-2 [&_pre]:rounded-lg [&_pre]:text-xs">
+                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  m.content
+                )}
               </div>
             ))}
 
