@@ -18,7 +18,10 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png'],
+      workbox: {
+        navigateFallbackDenylist: [/^\/~oauth/],
+      },
       manifest: {
         name: 'Brave Gestor',
         short_name: 'Brave',
@@ -26,6 +29,7 @@ export default defineConfig(({ mode }) => ({
         theme_color: '#3e48f7',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/',
         icons: [
           {
             src: '/pwa-192x192.png',
@@ -36,6 +40,12 @@ export default defineConfig(({ mode }) => ({
             src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }
