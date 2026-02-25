@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AIChatWidget } from "@/components/AIChatWidget";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import Index from "./pages/Index";
 import Clients from "./pages/Clients";
@@ -57,7 +58,7 @@ function ProtectedLayout() {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar />
-        <main className="flex-1 overflow-auto flex flex-col min-h-0">
+        <main className="flex-1 overflow-auto flex flex-col min-h-0 pb-14 lg:pb-0">
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/clients" element={<Clients />} />
@@ -75,6 +76,7 @@ function ProtectedLayout() {
           </Routes>
         </main>
       </div>
+      <MobileBottomNav />
       <CommandPalette />
       <AIChatWidget />
     </div>
