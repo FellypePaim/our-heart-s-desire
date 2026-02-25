@@ -3,6 +3,7 @@ import { Bot, Send, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -52,11 +53,15 @@ export function AIChatWidget() {
     };
 
     try {
+      // Get current session token for authenticated request
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ messages: [...messages, userMsg] }),
       });
@@ -141,8 +146,8 @@ export function AIChatWidget() {
           <div className="flex items-center gap-3 border-b bg-primary px-4 py-3">
             <Bot className="h-5 w-5 text-primary-foreground" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-primary-foreground">Assistente Brave</p>
-              <p className="text-xs text-primary-foreground/70">IA para insights e dicas</p>
+              <p className="text-sm font-semibold text-primary-foreground">Assistente IPTV</p>
+              <p className="text-xs text-primary-foreground/70">Insights da sua base</p>
             </div>
             <button onClick={() => setOpen(false)} className="text-primary-foreground/70 hover:text-primary-foreground">
               <X className="h-5 w-5" />
@@ -155,11 +160,11 @@ export function AIChatWidget() {
               <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
                 <Sparkles className="h-10 w-10 text-primary/40" />
                 <div>
-                  <p className="font-medium text-foreground">Olá! Sou o Assistente Brave 👋</p>
-                  <p className="text-sm mt-1">Pergunte sobre estratégias de retenção, dicas de cobrança, ou como usar o sistema.</p>
+                  <p className="font-medium text-foreground">Olá! Sou o Assistente IPTV 👋</p>
+                  <p className="text-sm mt-1">Pergunte sobre gestão de clientes, estratégias de retenção ou análise da sua base.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
-                  {["Como reduzir churn?", "Dicas de cobrança", "Como usar filtros?"].map((q) => (
+                  {["Como reduzir churn IPTV?", "Análise da minha base", "Dicas de renovação"].map((q) => (
                     <button
                       key={q}
                       onClick={() => { setInput(q); }}
