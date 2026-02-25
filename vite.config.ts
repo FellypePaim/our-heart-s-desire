@@ -20,9 +20,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'IPTV Radar',
-        short_name: 'Radar',
-        description: 'Gestão Inteligente de IPTV',
+        name: 'Brave Gestor',
+        short_name: 'Brave',
+        description: 'Gestão Inteligente de Clientes',
         theme_color: '#3e48f7',
         background_color: '#ffffff',
         display: 'standalone',
