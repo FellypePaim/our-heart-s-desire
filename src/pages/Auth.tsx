@@ -66,13 +66,13 @@ const Auth = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
               <Radar className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-sidebar-primary">IPTV Radar</span>
+            <span className="text-xl font-bold tracking-tight text-sidebar-primary">Brave Gestor</span>
           </div>
         </div>
 
         <div className="relative z-10 space-y-6">
           <h1 className="text-4xl font-bold leading-tight text-sidebar-primary">
-            Controle total do seu painel IPTV
+            Controle total dos seus clientes
           </h1>
           <p className="text-lg text-sidebar-foreground/70 max-w-md">
             Gerencie clientes, monitore vencimentos e automatize cobranças em uma única plataforma inteligente.
@@ -92,7 +92,7 @@ const Auth = () => {
         </div>
 
         <div className="relative z-10 text-sm text-sidebar-foreground/40">
-          © {new Date().getFullYear()} IPTV Radar. Todos os direitos reservados.
+          © {new Date().getFullYear()} Brave Gestor. Todos os direitos reservados.
         </div>
       </div>
 
@@ -109,7 +109,7 @@ const Auth = () => {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">
               <Radar className="h-6 w-6 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold tracking-tight">IPTV Radar</span>
+            <span className="text-xl font-bold tracking-tight">Brave Gestor</span>
           </div>
 
           {/* Header */}

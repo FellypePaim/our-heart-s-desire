@@ -85,7 +85,7 @@ export function AppSidebar() {
           <Radar className="h-5 w-5 text-sidebar-primary-foreground" />
         </div>
         <div className="min-w-0">
-          <h1 className="font-bold text-sm text-sidebar-primary">IPTV Radar</h1>
+          <h1 className="font-bold text-sm text-sidebar-primary">Brave Gestor</h1>
           <p className="text-xs text-sidebar-foreground/60 truncate">
             {getRoleLabel()}
           </p>
