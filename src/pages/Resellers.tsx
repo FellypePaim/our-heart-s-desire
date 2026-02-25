@@ -393,7 +393,12 @@ const Resellers = () => {
                 const expired = expiresAt ? isPast(expiresAt) : true;
                 return (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.display_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>{r.display_name}</div>
+                    {profileMap.get(r.owner_user_id)?.email && (
+                      <span className="text-xs text-muted-foreground">{profileMap.get(r.owner_user_id)?.email}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={r.status === "active" ? "default" : "destructive"}>
                       {r.status === "active" ? "Ativo" : "Suspenso"}
