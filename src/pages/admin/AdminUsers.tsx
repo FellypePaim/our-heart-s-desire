@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAllUserRoles } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
+import { useResellers } from "@/hooks/useResellers";
+import { useAllClients } from "@/hooks/useSuperAdmin";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
@@ -78,9 +80,12 @@ function useSort(initial: string = "") {
 const AdminUsers = () => {
   const { isSuperAdmin, loading, user } = useAuth();
   const { data: roles, isLoading } = useAllUserRoles();
+  const { data: resellers } = useResellers();
+  const { data: allClients } = useAllClients();
   const [search, setSearch] = useState("");
   const { hidden, toggle: togglePrivacy } = usePrivacyMode();
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterOwner, setFilterOwner] = useState<string>("all");
   const [page, setPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -140,9 +145,60 @@ const AdminUsers = () => {
     return roleRank[targetRole] < roleRank["super_admin"];
   }, []);
 
+  // Build owner options: masters and resellers
+  const ownerOptions = useMemo(() => {
+    const options: { id: string; label: string; type: "master" | "reseller" }[] = [];
+    // Masters (panel_admin)
+    const masters = roles?.filter((r) => r.role === "panel_admin") || [];
+    masters.forEach((m) => {
+      options.push({ id: m.user_id, label: `👤 ${getUserName(m.user_id)} (Master)`, type: "master" });
+    });
+    // Resellers
+    resellers?.forEach((r) => {
+      options.push({ id: r.owner_user_id, label: `🏪 ${r.display_name} (Revenda)`, type: "reseller" });
+    });
+    return options;
+  }, [roles, resellers, getUserName]);
+
+  // Build set of user_ids that belong to a selected owner
+  const ownerUserIds = useMemo(() => {
+    if (filterOwner === "all") return null;
+
+    const ids = new Set<string>();
+    ids.add(filterOwner); // Always include the owner themselves
+
+    const ownerOption = ownerOptions.find((o) => o.id === filterOwner);
+    if (!ownerOption) return ids;
+
+    if (ownerOption.type === "master") {
+      // Include resellers created by this master
+      resellers?.forEach((r) => {
+        if (r.created_by === filterOwner) {
+          ids.add(r.owner_user_id);
+        }
+      });
+      // Include clients owned directly by this master
+      allClients?.forEach((c) => {
+        if (c.user_id === filterOwner) {
+          // Client records belong to this master - but these are records, not user accounts
+          // We don't add client record IDs to user filter
+        }
+      });
+    } else if (ownerOption.type === "reseller") {
+      // Find the reseller record for this user
+      const resellerRecord = resellers?.find((r) => r.owner_user_id === filterOwner);
+      if (resellerRecord) {
+        // The reseller themselves is already added
+      }
+    }
+
+    return ids;
+  }, [filterOwner, ownerOptions, resellers, allClients]);
+
   const filteredRoles = useMemo(() => {
     const list = roles?.filter((r) => {
       if (filterRole !== "all" && r.role !== filterRole) return false;
+      if (ownerUserIds && !ownerUserIds.has(r.user_id)) return false;
       if (search) {
         const q = search.toLowerCase();
         const name = getUserName(r.user_id).toLowerCase();
@@ -157,9 +213,9 @@ const AdminUsers = () => {
       if (key === "created_at") return item.created_at;
       return (item as any)[key];
     });
-  }, [roles, filterRole, search, allSort.sortFn, getUserName]);
+  }, [roles, filterRole, filterOwner, ownerUserIds, search, allSort.sortFn, getUserName]);
 
-  const filterKey = `${search}|${filterRole}`;
+  const filterKey = `${search}|${filterRole}|${filterOwner}`;
   useEffect(() => { setPage(1); }, [filterKey]);
 
   const exportCSV = useCallback(() => {
@@ -386,6 +442,15 @@ const AdminUsers = () => {
             <SelectItem value="panel_admin">Master</SelectItem>
             <SelectItem value="reseller">Revendedor</SelectItem>
             <SelectItem value="user">Cliente Final</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterOwner} onValueChange={setFilterOwner}>
+          <SelectTrigger className="w-[240px]"><SelectValue placeholder="Filtrar por proprietário" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os proprietários</SelectItem>
+            {ownerOptions.map((o) => (
+              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Button variant="outline" size="icon" onClick={togglePrivacy} title={hidden ? "Mostrar" : "Ocultar"} className="h-9 w-9">
