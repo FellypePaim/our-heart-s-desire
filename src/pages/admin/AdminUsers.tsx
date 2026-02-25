@@ -162,23 +162,30 @@ const AdminUsers = () => {
 
   // Build owner options: masters and resellers with counts
   const ownerOptions = useMemo(() => {
-    const options: { id: string; label: string; type: "master" | "reseller" }[] = [];
+    const options: { id: string; label: string; type: "super_admin" | "master" | "reseller" }[] = [];
 
-    // Count direct clients per master and per reseller
-    const masterDirectCount: Record<string, number> = {};
+    // Count direct clients per user and per reseller
+    const directCount: Record<string, number> = {};
     const resellerCount: Record<string, number> = {};
     (allClients || []).forEach((c) => {
       if (!c.reseller_id) {
-        masterDirectCount[c.user_id] = (masterDirectCount[c.user_id] || 0) + 1;
+        directCount[c.user_id] = (directCount[c.user_id] || 0) + 1;
       } else {
         resellerCount[c.reseller_id] = (resellerCount[c.reseller_id] || 0) + 1;
       }
     });
 
+    // SuperAdmins
+    const superAdmins = roles?.filter((r) => r.role === "super_admin") || [];
+    superAdmins.forEach((sa) => {
+      const count = directCount[sa.user_id] || 0;
+      options.push({ id: sa.user_id, label: `👑 ${getUserName(sa.user_id)} (SuperAdmin) · ${count}`, type: "super_admin" });
+    });
+
     // Masters (panel_admin)
     const masters = roles?.filter((r) => r.role === "panel_admin") || [];
     masters.forEach((m) => {
-      const count = masterDirectCount[m.user_id] || 0;
+      const count = directCount[m.user_id] || 0;
       options.push({ id: m.user_id, label: `👤 ${getUserName(m.user_id)} (Master) · ${count}`, type: "master" });
     });
     // Resellers
@@ -199,18 +206,11 @@ const AdminUsers = () => {
     const ownerOption = ownerOptions.find((o) => o.id === filterOwner);
     if (!ownerOption) return ids;
 
-    if (ownerOption.type === "master") {
-      // Include resellers created by this master
+    if (ownerOption.type === "super_admin" || ownerOption.type === "master") {
+      // Include resellers created by this user
       resellers?.forEach((r) => {
         if (r.created_by === filterOwner) {
           ids.add(r.owner_user_id);
-        }
-      });
-      // Include clients owned directly by this master
-      allClients?.forEach((c) => {
-        if (c.user_id === filterOwner) {
-          // Client records belong to this master - but these are records, not user accounts
-          // We don't add client record IDs to user filter
         }
       });
     } else if (ownerOption.type === "reseller") {
@@ -281,8 +281,8 @@ const AdminUsers = () => {
         if (ownerUserIds) {
           const ownerOption = ownerOptions.find((o) => o.id === filterOwner);
           let matches = false;
-          if (ownerOption?.type === "master") {
-            // Only show clients directly owned by this master (not via resellers)
+          if (ownerOption?.type === "super_admin" || ownerOption?.type === "master") {
+            // Only show clients directly owned by this user (not via resellers)
             matches = c.user_id === filterOwner && !c.reseller_id;
           } else if (ownerOption?.type === "reseller") {
             // Show clients belonging to this reseller
