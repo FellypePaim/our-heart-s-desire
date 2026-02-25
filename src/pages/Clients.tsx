@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
-import { getStatusFromDate } from "@/lib/status";
+import { getStatusFromDate, getAllStatuses, StatusKey } from "@/lib/status";
 import { Client } from "@/lib/supabase-types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientDetailDialog } from "@/components/ClientDetailDialog";
@@ -10,7 +10,7 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2, CalendarDays } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2, CalendarDays, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
 import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
 import { BulkRenewDialog } from "@/components/BulkRenewDialog";
@@ -27,8 +27,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 20;
+
+type SortField = "name" | "expiration_date" | "plan" | "status";
+type SortDir = "asc" | "desc";
 
 const Clients = () => {
   const { data: clients, isLoading } = useClients({ ownOnly: true });
@@ -42,7 +46,9 @@ const Clients = () => {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<SortField>("expiration_date");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -55,23 +61,71 @@ const Clients = () => {
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const allStatuses = getAllStatuses();
+
+  const statusPriority: Record<StatusKey, number> = {
+    expired: 0, post2: 1, post1: 2, today: 3, pre1: 4, pre2: 5, pre3: 6, active: 7,
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
 
   const filtered = useMemo(() => {
     if (!clients) return [];
-    if (!search) return clients;
-    const q = search.toLowerCase();
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.phone?.includes(q) ||
-        (c.plan || "").toLowerCase().includes(q) ||
-        (c.servidor || "").toLowerCase().includes(q) ||
-        (c.aplicativo || "").toLowerCase().includes(q) ||
-        (c.captacao || "").toLowerCase().includes(q)
-    );
-  }, [clients, search]);
+    let result = clients;
 
-  useEffect(() => { setPage(1); }, [search]);
+    if (statusFilter !== "all") {
+      result = result.filter((c) => getStatusFromDate(c.expiration_date).key === statusFilter);
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.phone?.includes(q) ||
+          (c.plan || "").toLowerCase().includes(q) ||
+          (c.servidor || "").toLowerCase().includes(q) ||
+          (c.aplicativo || "").toLowerCase().includes(q) ||
+          (c.captacao || "").toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "expiration_date":
+          cmp = a.expiration_date.localeCompare(b.expiration_date);
+          break;
+        case "plan":
+          cmp = (a.plan || "").localeCompare(b.plan || "");
+          break;
+        case "status":
+          cmp = statusPriority[getStatusFromDate(a.expiration_date).key] - statusPriority[getStatusFromDate(b.expiration_date).key];
+          break;
+      }
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+
+    return result;
+  }, [clients, search, statusFilter, sortField, sortDir]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -184,17 +238,41 @@ const Clients = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, telefone, plano, servidor..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filtrar por status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {allStatuses.map((s) => (
+              <SelectItem key={s.key} value={s.key}>
+                <span className="flex items-center gap-2">
+                  <s.icon className={cn("h-3.5 w-3.5", s.colorClass)} />
+                  {s.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+                <span className="flex items-center">Nome <SortIcon field="name" /></span>
+              </TableHead>
               <TableHead>WhatsApp</TableHead>
-              <TableHead>Plano</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("plan")}>
+                <span className="flex items-center">Plano <SortIcon field="plan" /></span>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("expiration_date")}>
+                <span className="flex items-center">Vencimento <SortIcon field="expiration_date" /></span>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("status")}>
+                <span className="flex items-center">Status <SortIcon field="status" /></span>
+              </TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
