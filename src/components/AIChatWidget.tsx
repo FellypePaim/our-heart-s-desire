@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, X, Sparkles } from "lucide-react";
+import { Bot, Send, X, Sparkles, Shield, Crown, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -17,6 +18,12 @@ export function AIChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const { roles, isSuperAdmin } = useAuth();
+
+  const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
+  const roleLabel = isSuperAdmin ? "SuperAdmin" : isPanelAdmin ? "Master" : isReseller ? "Revendedor" : "Usuário";
+  const RoleIcon = isSuperAdmin ? Crown : isPanelAdmin ? Shield : isReseller ? Users : User;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -147,7 +154,10 @@ export function AIChatWidget() {
             <Bot className="h-5 w-5 text-primary-foreground" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-primary-foreground">Assistente IPTV</p>
-              <p className="text-xs text-primary-foreground/70">Insights da sua base</p>
+              <div className="flex items-center gap-1.5">
+                <RoleIcon className="h-3 w-3 text-primary-foreground/70" />
+                <p className="text-xs text-primary-foreground/70">{roleLabel} · Insights da sua base</p>
+              </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-primary-foreground/70 hover:text-primary-foreground">
               <X className="h-5 w-5" />
