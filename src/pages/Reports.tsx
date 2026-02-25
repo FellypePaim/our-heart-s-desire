@@ -339,9 +339,9 @@ export default function Reports() {
               Resumo completo do mês anterior
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -355,9 +355,10 @@ export default function Reports() {
             <Button variant="outline" size="icon" onClick={toggle} className="h-9 w-9">
               {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button onClick={exportPDF} className="gap-2">
+            <Button onClick={exportPDF} size="sm" className="gap-2">
               <Download className="h-4 w-4" />
-              Exportar PDF
+              <span className="hidden sm:inline">Exportar PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
         </div>
