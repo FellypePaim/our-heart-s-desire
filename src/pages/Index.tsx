@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
-import { useAllClients } from "@/hooks/useSuperAdmin";
+
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { getStatusFromDate, DASHBOARD_COLUMNS, getAllStatuses, StatusKey } from "@/lib/status";
@@ -11,7 +11,7 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { ClientMetrics } from "@/components/radar/ClientMetrics";
 import { ResellerMetrics } from "@/components/radar/ResellerMetrics";
 import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
-import { GlobalMetrics } from "@/components/radar/GlobalMetrics";
+
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
 import { RiskScore } from "@/components/radar/RiskScore";
 import { OperationalLimits } from "@/components/OperationalLimits";
@@ -24,7 +24,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 const Index = () => {
   const { data: clients, isLoading } = useClients({ ownOnly: true });
   const { roles, isSuperAdmin: isSA } = useAuth();
-  const { data: allClients, isLoading: allLoading } = useAllClients();
+  
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const { hidden, toggle, mask } = usePrivacyMode();
 
@@ -78,16 +78,8 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Global Metrics for SuperAdmin */}
-      {isSuperAdmin && (
-        <>
-          <GlobalMetrics allClients={allClients || []} isLoading={allLoading} mask={hidden ? mask : undefined} />
-          <div className="border-t mx-4 md:mx-6" />
-          <div className="px-4 md:px-6 pt-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">📊 Meus Clientes Diretos</p>
-          </div>
-        </>
-      )}
+
+
 
       {/* Tabs */}
       <Tabs defaultValue="clients" className="flex-1 flex flex-col overflow-hidden">
