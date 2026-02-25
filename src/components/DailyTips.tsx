@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { Lightbulb, RefreshCw } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Lightbulb } from "lucide-react";
 import { Client } from "@/lib/supabase-types";
 import { getStatusFromDate } from "@/lib/status";
+import { cn } from "@/lib/utils";
 
 interface DailyTipsProps {
   clients: Client[];
@@ -118,6 +119,16 @@ function generateTips(clients: Client[]): Tip[] {
 
 export function DailyTips({ clients }: DailyTipsProps) {
   const tips = useMemo(() => generateTips(clients), [clients]);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  // Auto-rotate on mobile
+  useEffect(() => {
+    if (tips.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % tips.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [tips.length]);
 
   if (tips.length === 0) return null;
 
@@ -127,7 +138,9 @@ export function DailyTips({ clients }: DailyTipsProps) {
         <Lightbulb className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">Dicas do dia</h3>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+      {/* Desktop: grid with all 3 */}
+      <div className="hidden md:grid md:grid-cols-3 gap-3">
         {tips.map((tip, i) => (
           <div
             key={i}
@@ -138,6 +151,38 @@ export function DailyTips({ clients }: DailyTipsProps) {
             <p className="text-sm text-muted-foreground leading-relaxed">{tip.text}</p>
           </div>
         ))}
+      </div>
+
+      {/* Mobile: single slide carousel */}
+      <div className="md:hidden">
+        <div className="relative overflow-hidden">
+          {tips.map((tip, i) => (
+            <div
+              key={i}
+              className={cn(
+                "flex gap-3 items-start rounded-lg bg-muted/50 p-3 transition-all duration-500",
+                i === activeSlide ? "opacity-100" : "opacity-0 absolute inset-0 pointer-events-none"
+              )}
+            >
+              <span className="text-lg shrink-0">{tip.emoji}</span>
+              <p className="text-sm text-muted-foreground leading-relaxed">{tip.text}</p>
+            </div>
+          ))}
+        </div>
+        {/* Dots indicator */}
+        <div className="flex justify-center gap-1.5 mt-3">
+          {tips.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveSlide(i)}
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                i === activeSlide ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
+              )}
+              aria-label={`Dica ${i + 1}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
