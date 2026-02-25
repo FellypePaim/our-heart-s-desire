@@ -55,8 +55,15 @@ function ProtectedLayout() {
 
   // On first login after email confirmation, setup role if missing
   useEffect(() => {
-    if (!user || roles.length > 0) return;
-    // Prevent infinite reload loop
+    if (!user) return;
+    
+    // If roles already loaded, clear any leftover guard
+    if (roles.length > 0) {
+      sessionStorage.removeItem(`self-register-${user.id}`);
+      return;
+    }
+
+    // Prevent infinite reload loop - keep guard until roles load
     const alreadyCalled = sessionStorage.getItem(`self-register-${user.id}`);
     if (alreadyCalled) return;
 
@@ -76,7 +83,7 @@ function ProtectedLayout() {
         clearInterval(interval);
         setSetupProgress(100);
         setTimeout(() => {
-          sessionStorage.removeItem(`self-register-${user.id}`);
+          // DON'T remove sessionStorage before reload - it prevents re-triggering
           window.location.reload();
         }, 600);
       }).catch((err) => {
