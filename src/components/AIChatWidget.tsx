@@ -25,6 +25,14 @@ export function AIChatWidget() {
   const roleLabel = isSuperAdmin ? "SuperAdmin" : isPanelAdmin ? "Master" : isReseller ? "Revendedor" : "Usuário";
   const RoleIcon = isSuperAdmin ? Crown : isPanelAdmin ? Shield : isReseller ? Users : User;
 
+  const suggestions = isSuperAdmin
+    ? ["Quantos usuários tem no sistema?", "Métricas globais da plataforma", "Comparar performance dos Masters"]
+    : isPanelAdmin
+    ? ["Como reduzir churn da minha base?", "Análise dos meus revendedores", "Clientes vencendo em breve"]
+    : isReseller
+    ? ["Dicas de renovação para meus clientes", "Análise da minha base", "Clientes em risco de churn"]
+    : ["Como funciona o IPTV?", "Dicas de atendimento ao cliente", "Boas práticas de gestão"];
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -174,7 +182,7 @@ export function AIChatWidget() {
                   <p className="text-sm mt-1">Pergunte sobre gestão de clientes, estratégias de retenção ou análise da sua base.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
-                  {["Como reduzir churn IPTV?", "Análise da minha base", "Dicas de renovação"].map((q) => (
+                  {suggestions.map((q) => (
                     <button
                       key={q}
                       onClick={() => { setInput(q); }}
