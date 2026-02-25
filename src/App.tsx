@@ -22,6 +22,21 @@ import ServiceConfig from "./pages/ServiceConfig";
 
 const queryClient = new QueryClient();
 
+function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
+  const { isSuperAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function RequireRole({ roles: allowedRoles, children }: { roles: string[]; children: React.ReactNode }) {
+  const { roles, loading } = useAuth();
+  if (loading) return null;
+  const hasRole = roles.some((r) => allowedRoles.includes(r.role) && r.is_active);
+  if (!hasRole) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function ProtectedLayout() {
   const { session, loading } = useAuth();
 
@@ -43,15 +58,15 @@ function ProtectedLayout() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/clients" element={<Clients />} />
-            <Route path="/resellers" element={<Resellers />} />
+            <Route path="/resellers" element={<RequireRole roles={["panel_admin", "super_admin"]}><Resellers /></RequireRole>} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/service-config" element={<ServiceConfig />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
-            <Route path="/admin/services" element={<AdminServiceConfig />} />
-            <Route path="/admin/audit" element={<AdminAudit />} />
+            <Route path="/admin" element={<RequireSuperAdmin><AdminDashboard /></RequireSuperAdmin>} />
+            <Route path="/admin/users" element={<RequireSuperAdmin><AdminUsers /></RequireSuperAdmin>} />
+            <Route path="/admin/settings" element={<RequireSuperAdmin><AdminSettings /></RequireSuperAdmin>} />
+            <Route path="/admin/services" element={<RequireSuperAdmin><AdminServiceConfig /></RequireSuperAdmin>} />
+            <Route path="/admin/audit" element={<RequireSuperAdmin><AdminAudit /></RequireSuperAdmin>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
