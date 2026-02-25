@@ -14,6 +14,10 @@ import { format, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, isEqual
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, BarChart, Bar, Area, AreaChart
+} from "recharts";
 
 function getMonthOptions() {
   const options: { value: string; label: string }[] = [];
@@ -153,6 +157,42 @@ export default function Reports() {
     () => computeMetrics(clients || [], selectedMonth),
     [clients, selectedMonth]
   );
+
+  // Compute last 6 months of metrics for trend charts
+  const trendData = useMemo(() => {
+    if (!clients) return [];
+    const data: {
+      month: string;
+      label: string;
+      total: number;
+      ativos: number;
+      novos: number;
+      perdidos: number;
+      receita: number;
+      receitaAtiva: number;
+      churn: number;
+      ticket: number;
+    }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 1; i--) {
+      const d = subMonths(now, i);
+      const key = format(d, "yyyy-MM");
+      const m = computeMetrics(clients, key);
+      data.push({
+        month: key,
+        label: format(d, "MMM yy", { locale: ptBR }),
+        total: m.totalClients,
+        ativos: m.activeClients,
+        novos: m.newClients,
+        perdidos: m.lostClients,
+        receita: m.totalRevenue,
+        receitaAtiva: m.activeRevenue,
+        churn: m.churnRate,
+        ticket: m.avgTicket,
+      });
+    }
+    return data;
+  }, [clients]);
 
   const fmtVal = (v: number) => (hidden ? mask(String(v), "value") : formatBRL(v));
 
@@ -336,6 +376,76 @@ export default function Reports() {
             </div>
           ))}
         </div>
+
+        {/* Trend Charts */}
+        {trendData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Clients Evolution */}
+            <div className="rounded-xl border bg-card/60 p-5">
+              <h3 className="text-sm font-semibold mb-4">Evolução de Clientes (6 meses)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Area type="monotone" dataKey="total" name="Total" stroke="hsl(220, 70%, 50%)" fill="hsl(220, 70%, 50%)" fillOpacity={0.1} strokeWidth={2} />
+                  <Area type="monotone" dataKey="ativos" name="Ativos" stroke="hsl(142, 60%, 40%)" fill="hsl(142, 60%, 40%)" fillOpacity={0.1} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Revenue Evolution */}
+            <div className="rounded-xl border bg-card/60 p-5">
+              <h3 className="text-sm font-semibold mb-4">Evolução de Receita (6 meses)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
+                  <Tooltip formatter={(v: number) => [formatBRL(v)]} />
+                  <Legend />
+                  <Area type="monotone" dataKey="receita" name="Receita Total" stroke="hsl(220, 70%, 50%)" fill="hsl(220, 70%, 50%)" fillOpacity={0.1} strokeWidth={2} />
+                  <Area type="monotone" dataKey="receitaAtiva" name="Receita Ativa" stroke="hsl(142, 60%, 40%)" fill="hsl(142, 60%, 40%)" fillOpacity={0.1} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* New vs Lost */}
+            <div className="rounded-xl border bg-card/60 p-5">
+              <h3 className="text-sm font-semibold mb-4">Novos vs Perdidos (6 meses)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="novos" name="Novos" fill="hsl(142, 60%, 40%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="perdidos" name="Perdidos" fill="hsl(0, 70%, 50%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Churn & Ticket */}
+            <div className="rounded-xl border bg-card/60 p-5">
+              <h3 className="text-sm font-semibold mb-4">Churn % & Ticket Médio (6 meses)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
+                  <Tooltip formatter={(v: number, name: string) => [name === "Churn %" ? `${v}%` : formatBRL(v), name]} />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="churn" name="Churn %" stroke="hsl(15, 95%, 50%)" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="ticket" name="Ticket Médio" stroke="hsl(220, 70%, 50%)" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
