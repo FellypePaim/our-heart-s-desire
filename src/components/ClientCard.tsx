@@ -31,9 +31,9 @@ export function ClientCard({ client, onClick, maskPhone }: ClientCardProps) {
     <>
       <Card
         className={cn(
-          "cursor-pointer border transition-all hover:shadow-md",
+          "cursor-pointer border glass card-hover rounded-xl",
           status.borderClass,
-          client.is_suspended && "opacity-60"
+          client.is_suspended && "opacity-60 grayscale"
         )}
         onClick={onClick}
       >

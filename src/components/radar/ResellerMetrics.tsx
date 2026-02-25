@@ -1,7 +1,17 @@
 import { useMemo } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { format } from "date-fns";
 import { useResellers } from "@/hooks/useResellers";
 import { useClients } from "@/hooks/useClients";
-import { Users, UserCheck, UserX, BarChart3, DollarSign, TrendingUp } from "lucide-react";
+import { Users, UserCheck, UserX, BarChart3, DollarSign, TrendingUp, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
@@ -82,8 +92,85 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
 
   const PIE_COLORS = ["hsl(220, 70%, 50%)", "hsl(142, 60%, 40%)", "hsl(45, 80%, 48%)", "hsl(280, 60%, 50%)", "hsl(15, 95%, 50%)", "hsl(190, 70%, 45%)", "hsl(0, 70%, 45%)", "hsl(320, 60%, 50%)"];
 
+  const handleExportPDF = () => {
+    if (!resellers) return;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Relatório de Saúde - Revendedores", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 30);
+
+    const tableData = resellers.map((r) => {
+      const limit = r.limits?.max_clients || 50;
+      const usage = Math.round(((r.client_count || 0) / limit) * 100);
+      const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
+      const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
+      return [
+        r.display_name,
+        r.status === "active" ? "Ativo" : "Suspenso",
+        r.client_count || 0,
+        fmt(rRevenue),
+        limit,
+        `${usage}%`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Revendedor", "Status", "Clientes", "Receita", "Limite", "Uso"]],
+      body: tableData,
+    });
+
+    doc.save("relatorio_revendedores.pdf");
+  };
+
+  const handleExportCSV = () => {
+    if (!resellers) return;
+    const headers = ["Revendedor,Status,Clientes,Receita,Limite,Uso%"];
+    const rows = resellers.map((r) => {
+      const limit = r.limits?.max_clients || 50;
+      const usage = Math.round(((r.client_count || 0) / limit) * 100);
+      const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
+      const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
+      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmt(rRevenue)}",${limit},${usage}`;
+    });
+
+    const csvContent = "\uFEFF" + headers.concat(rows).join("\n"); // Add BOM for Excel Portuguese support
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "relatorio_revendedores.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 overflow-auto">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold tracking-tight text-sidebar-primary">Saúde dos Revendedores</h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2 glass">
+              <Download className="h-4 w-4" />
+              Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportPDF} className="gap-2 cursor-pointer">
+              <FileText className="h-4 w-4 text-red-500" />
+              PDF White Label
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              Planilha (CSV)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-lg border bg-card p-4 space-y-1">

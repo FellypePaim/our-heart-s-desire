@@ -34,7 +34,7 @@ const actionLabels: Record<string, string> = {
   user_unblocked: "Usuário desbloqueado",
   user_role_deleted: "Cargo removido",
   role_changed: "Cargo alterado",
-  
+
 };
 
 const AdminAudit = () => {
@@ -106,15 +106,15 @@ const AdminAudit = () => {
         </Select>
       </div>
 
-      <div className="rounded-lg border bg-card overflow-x-auto">
+      <div className="rounded-xl border bg-card/60 glass shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Data/Hora</TableHead>
-              <TableHead>Usuário</TableHead>
-              <TableHead>Ação</TableHead>
-              <TableHead className="hidden md:table-cell">Tipo</TableHead>
-              <TableHead className="hidden md:table-cell">Detalhes</TableHead>
+            <TableRow className="hover:bg-transparent border-b-border/40">
+              <TableHead className="font-semibold">Data/Hora</TableHead>
+              <TableHead className="font-semibold">Usuário</TableHead>
+              <TableHead className="font-semibold">Ação</TableHead>
+              <TableHead className="hidden md:table-cell font-semibold">Tipo</TableHead>
+              <TableHead className="hidden md:table-cell font-semibold">Detalhes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -124,13 +124,13 @@ const AdminAudit = () => {
               <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum log encontrado</TableCell></TableRow>
             ) : (
               filtered.map((log) => (
-                <TableRow key={log.id}>
+                <TableRow key={log.id} className="hover:bg-muted/30 transition-colors">
                   <TableCell className="font-mono text-xs whitespace-nowrap">
                     {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
                   </TableCell>
                   <TableCell className="font-medium text-sm">{getUserName(log.user_id)}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="outline" className="text-[10px] uppercase font-semibold tracking-wider bg-background/50">
                       {actionLabels[log.action] || log.action}
                     </Badge>
                   </TableCell>

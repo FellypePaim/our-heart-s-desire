@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useClients } from "@/hooks/useClients";
 import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,7 +41,7 @@ const Clients = () => {
   const { data: resellers } = useResellers();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [search, setSearch] = useState("");
   const [ownershipFilter, setOwnershipFilter] = useState<string>("mine");
   const [resellerFilter, setResellerFilter] = useState<string>("all");
@@ -87,7 +87,7 @@ const Clients = () => {
     return result;
   }, [clients, search, ownershipFilter, resellerFilter, isPanelAdmin, isSuperAdmin, user?.id]);
 
-  useMemo(() => { setPage(1); }, [search, ownershipFilter, resellerFilter]);
+  useEffect(() => { setPage(1); }, [search, ownershipFilter, resellerFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);

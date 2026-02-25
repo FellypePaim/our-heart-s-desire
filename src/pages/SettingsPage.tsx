@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Camera, Lock, Mail } from "lucide-react";
+import { Settings, User, Camera, Lock, Mail, Smartphone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ const SettingsPage = () => {
   const [displayName, setDisplayName] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const [uazapiKey, setUazapiKey] = useState("");
+  const [uazapiToken, setUazapiToken] = useState("");
+  const [uazapiLoading, setUazapiLoading] = useState(false);
 
   const getRoleLabel = () => {
     if (roles.some((r) => r.role === "super_admin" && r.is_active)) return "SuperAdmin";
@@ -41,6 +45,24 @@ const SettingsPage = () => {
       if (error) throw error;
       if (data) {
         setDisplayName(data.display_name || "");
+      }
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: whatsappInstance, isLoading: whatsappFetching } = useQuery({
+    queryKey: ["whatsapp_instance", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_instances")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      if (data) {
+        setUazapiKey(data.instance_key || "");
+        setUazapiToken(data.api_token || "");
       }
       return data;
     },
@@ -127,6 +149,32 @@ const SettingsPage = () => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const handleSaveUazapi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setUazapiLoading(true);
+    try {
+      if (whatsappInstance) {
+        const { error } = await supabase
+          .from("whatsapp_instances")
+          .update({ instance_key: uazapiKey.trim(), api_token: uazapiToken.trim() })
+          .eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("whatsapp_instances")
+          .insert({ user_id: user.id, instance_key: uazapiKey.trim(), api_token: uazapiToken.trim() });
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ["whatsapp_instance"] });
+      toast({ title: "Integração do WhatsApp atualizada!" });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setUazapiLoading(false);
     }
   };
 
@@ -223,6 +271,46 @@ const SettingsPage = () => {
             </div>
             <Button type="submit" disabled={passwordLoading}>
               {passwordLoading ? "Salvando..." : "Alterar Senha"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* UAZAPI Integration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="h-5 w-5" />
+            Integração WhatsApp (UAZAPI)
+          </CardTitle>
+          <CardDescription>Configure sua instância do UAZAPI para mensagens automáticas ({whatsappInstance ? "Status Através de Tabela" : "Não configurado"})</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveUazapi} className="space-y-4 max-w-sm">
+            <div className="space-y-2">
+              <Label htmlFor="uazapi-key">Nome/Chave da Instância (Instance Key)</Label>
+              <Input
+                id="uazapi-key"
+                type="text"
+                value={uazapiKey}
+                onChange={(e) => setUazapiKey(e.target.value)}
+                placeholder="Ex: uaz1234..."
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="uazapi-token">Token da API (Global/Admin APIKey)</Label>
+              <Input
+                id="uazapi-token"
+                type="password"
+                value={uazapiToken}
+                onChange={(e) => setUazapiToken(e.target.value)}
+                placeholder="Sua API Key do UAZAPI"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={uazapiLoading} className="glass card-hover">
+              {uazapiLoading ? "Salvando..." : "Salvar Configuração"}
             </Button>
           </form>
         </CardContent>

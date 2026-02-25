@@ -12,11 +12,11 @@ interface DashboardColumnProps {
 
 export function DashboardColumn({ status, clients, onClientClick, maskPhone }: DashboardColumnProps) {
   const Icon = status.icon;
-  
+
   return (
     <div className="flex flex-col min-w-[300px] max-w-[340px]">
       <div className={cn(
-        "flex items-center gap-2 rounded-t-lg border px-4 py-3",
+        "flex items-center gap-2 rounded-t-xl border px-4 py-3 shadow-sm",
         status.bgClass,
         status.borderClass
       )}>
@@ -33,9 +33,8 @@ export function DashboardColumn({ status, clients, onClientClick, maskPhone }: D
         </span>
       </div>
       <div className={cn(
-        "flex-1 space-y-2 rounded-b-lg border border-t-0 p-2 min-h-[200px]",
-        status.borderClass,
-        "bg-card/50"
+        "flex-1 space-y-3 rounded-b-xl border border-t-0 p-3 min-h-[200px] shadow-sm glass",
+        status.borderClass
       )}>
         {clients.length === 0 ? (
           <p className="py-8 text-center text-xs text-muted-foreground">
@@ -52,6 +51,6 @@ export function DashboardColumn({ status, clients, onClientClick, maskPhone }: D
           ))
         )}
       </div>
-    </div>
+    </div >
   );
 }

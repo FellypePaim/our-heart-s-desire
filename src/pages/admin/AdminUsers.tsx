@@ -160,7 +160,7 @@ const AdminUsers = () => {
   }, [roles, filterRole, search, allSort.sortFn, getUserName]);
 
   const filterKey = `${search}|${filterRole}`;
-  useMemo(() => { setPage(1); }, [filterKey]);
+  useEffect(() => { setPage(1); }, [filterKey]);
 
   const exportCSV = useCallback(() => {
     const headers = ["Nome", "Cargo", "Status", "Data"];

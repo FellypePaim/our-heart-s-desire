@@ -104,7 +104,9 @@ export function BulkWhatsAppDialog({ clients, open, onOpenChange }: BulkWhatsApp
             template_used: templateKey || "bulk",
             delivery_status: "sent",
           });
-        } catch {}
+        } catch (e) {
+          console.error("Erro ao registrar log", e);
+        }
       }
 
       count++;

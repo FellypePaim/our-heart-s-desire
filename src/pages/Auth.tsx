@@ -60,7 +60,7 @@ const Auth = () => {
           <div className="absolute bottom-32 right-16 w-96 h-96 rounded-full border border-sidebar-foreground/20" />
           <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full border border-sidebar-foreground/20" />
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
@@ -97,8 +97,13 @@ const Auth = () => {
       </div>
 
       {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-sm space-y-8">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
+
+        {/* Abstract background blur orbs */}
+        <div className="absolute top-1/4 -right-32 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-60 pointer-events-none" />
+        <div className="absolute -bottom-32 left-1/4 w-[500px] h-[500px] bg-secondary/30 rounded-full blur-[120px] opacity-60 pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-sm space-y-8 p-8 glass rounded-2xl shadow-xl">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 justify-center mb-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">

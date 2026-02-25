@@ -16,10 +16,11 @@ export function usePrivacyMode(defaultHidden = false) {
           return value.replace(/\d(?=\d{2})/g, "•");
         case "value":
           return "R$ •••";
-        case "email":
+        case "email": {
           const [local, domain] = value.split("@");
           if (!domain) return "•••";
           return `${local[0]}${"•".repeat(Math.max(local.length - 1, 2))}@${domain}`;
+        }
         default:
           return "•".repeat(Math.min(value.length, 8));
       }

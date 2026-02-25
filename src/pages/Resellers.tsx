@@ -1,7 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useResellers, Reseller } from "@/hooks/useResellers";
+import { useClients } from "@/hooks/useClients";
 import { Navigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { format } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle, Download, FileText, FileSpreadsheet } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLimitCheck } from "@/hooks/useLimitCheck";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -35,6 +45,7 @@ const Resellers = () => {
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const { data: resellers, isLoading } = useResellers();
+  const { data: clients } = useClients();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [page, setPage] = useState(1);
@@ -118,8 +129,8 @@ const Resellers = () => {
           .eq("owner_user_id", data.user_id);
       }
 
-      await logAudit(user.id, "reseller_created", "reseller", undefined, { 
-        display_name: newDisplayName, email: newEmail 
+      await logAudit(user.id, "reseller_created", "reseller", undefined, {
+        display_name: newDisplayName, email: newEmail
       });
       toast({ title: "Revendedor criado!", description: `${newDisplayName} (${newEmail}) foi cadastrado com acesso.` });
       queryClient.invalidateQueries({ queryKey: ["resellers"] });
@@ -212,6 +223,63 @@ const Resellers = () => {
     }
   };
 
+  const handleExportPDF = () => {
+    if (!resellers) return;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Relatório de Saúde - Revendedores", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 30);
+
+    const tableData = resellers.map((r) => {
+      const limit = r.limits?.max_clients || 50;
+      const usage = Math.round(((r.client_count || 0) / limit) * 100);
+      const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
+      const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
+      const fmtRev = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rRevenue);
+      return [
+        r.display_name,
+        r.status === "active" ? "Ativo" : "Suspenso",
+        r.client_count || 0,
+        fmtRev,
+        limit,
+        `${usage}%`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Revendedor", "Status", "Clientes", "Receita", "Limite", "Uso"]],
+      body: tableData,
+    });
+
+    doc.save("relatorio_revendedores.pdf");
+  };
+
+  const handleExportCSV = () => {
+    if (!resellers) return;
+    const headers = ["Revendedor,Status,Clientes,Receita,Limite,Uso%"];
+    const rows = resellers.map((r) => {
+      const limit = r.limits?.max_clients || 50;
+      const usage = Math.round(((r.client_count || 0) / limit) * 100);
+      const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
+      const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
+      const fmtRev = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rRevenue);
+      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmtRev}",${limit},${usage}`;
+    });
+
+    const csvContent = "\uFEFF" + headers.concat(rows).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "relatorio_revendedores.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -225,19 +293,40 @@ const Resellers = () => {
           </p>
         </div>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Button className="gap-2" disabled={!canCreateReseller} onClick={() => canCreateReseller && setCreateOpen(true)}>
-                {!canCreateReseller && <AlertTriangle className="h-4 w-4" />}
-                <Plus className="h-4 w-4" /> Novo Revendedor
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 glass">
+                <Download className="h-4 w-4" />
+                Exportar
               </Button>
-            </span>
-          </TooltipTrigger>
-          {!canCreateReseller && (
-            <TooltipContent><p>{resellerLimitMsg}</p></TooltipContent>
-          )}
-        </Tooltip>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF} className="gap-2 cursor-pointer">
+                <FileText className="h-4 w-4 text-red-500" />
+                PDF White Label
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                Planilha (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button className="gap-2" disabled={!canCreateReseller} onClick={() => canCreateReseller && setCreateOpen(true)}>
+                  {!canCreateReseller && <AlertTriangle className="h-4 w-4" />}
+                  <Plus className="h-4 w-4" /> Novo Revendedor
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!canCreateReseller && (
+              <TooltipContent><p>{resellerLimitMsg}</p></TooltipContent>
+            )}
+          </Tooltip>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

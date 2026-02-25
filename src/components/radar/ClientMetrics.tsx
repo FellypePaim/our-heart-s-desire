@@ -219,14 +219,14 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {kpiCards.map((kpi) => (
-          <div key={kpi.label} className="rounded-lg border bg-card p-4 space-y-1">
+          <div key={kpi.label} className="rounded-xl border bg-card/60 p-5 space-y-2 glass card-hover flex flex-col justify-between">
             <div className="flex items-center gap-2">
-              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-              <span className="text-xs text-muted-foreground truncate">{kpi.label}</span>
+              <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+              <span className="text-xs font-medium text-muted-foreground truncate">{kpi.label}</span>
             </div>
-            <p className="text-lg md:text-xl font-bold font-mono">
+            <p className="text-xl md:text-2xl font-bold font-mono tracking-tight mt-auto">
               {formatValue(kpi.value, kpi.format)}
             </p>
           </div>
@@ -236,8 +236,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Status Distribution Pie */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-4">Distribuição por Status</h3>
+        <div className="rounded-xl border bg-card/60 p-5 glass card-hover">
+          <h3 className="text-sm font-semibold mb-4 text-foreground/80">Distribuição por Status</h3>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
@@ -260,8 +260,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
         </div>
 
         {/* Server Distribution Bar */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-4">Clientes por Servidor</h3>
+        <div className="rounded-xl border bg-card/60 p-5 glass card-hover">
+          <h3 className="text-sm font-semibold mb-4 text-foreground/80">Clientes por Servidor</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={metrics.serverBreakdown} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 88%)" />
@@ -283,8 +283,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
         </div>
 
         {/* Payment Method Pie */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-semibold mb-4">Formas de Pagamento</h3>
+        <div className="rounded-xl border bg-card/60 p-5 glass card-hover">
+          <h3 className="text-sm font-semibold mb-4 text-foreground/80">Formas de Pagamento</h3>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
@@ -306,8 +306,8 @@ export function ClientMetrics({ clients, isLoading, mask }: ClientMetricsProps) 
         </div>
 
         {/* Revenue Summary Card */}
-        <div className="rounded-lg border bg-card p-4 space-y-4">
-          <h3 className="text-sm font-semibold">Resumo Financeiro</h3>
+        <div className="rounded-xl border bg-card/60 p-5 space-y-4 glass card-hover">
+          <h3 className="text-sm font-semibold text-foreground/80">Resumo Financeiro</h3>
           <div className="space-y-3">
             {[
               { label: "Receita Total (carteira)", value: metrics.totalRevenue, color: "text-foreground" },
