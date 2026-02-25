@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, X } from "lucide-react";
 import { Client } from "@/lib/supabase-types";
 import { getStatusFromDate } from "@/lib/status";
 import { cn } from "@/lib/utils";
@@ -120,6 +120,7 @@ function generateTips(clients: Client[]): Tip[] {
 export function DailyTips({ clients }: DailyTipsProps) {
   const tips = useMemo(() => generateTips(clients), [clients]);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
 
   // Auto-rotate on mobile
   useEffect(() => {
@@ -130,13 +131,22 @@ export function DailyTips({ clients }: DailyTipsProps) {
     return () => clearInterval(interval);
   }, [tips.length]);
 
-  if (tips.length === 0) return null;
+  if (tips.length === 0 || dismissed) return null;
 
   return (
     <div className="mx-4 md:mx-6 mt-4 rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold">Dicas do dia</h3>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Dicas do dia</h3>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-muted-foreground hover:text-foreground transition-colors p-1 -m-1 rounded-md hover:bg-muted"
+          aria-label="Fechar dicas"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Desktop: grid with all 3 */}
