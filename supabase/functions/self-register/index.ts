@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     if (roleError) throw roleError;
 
     // Create profile (trigger sets trial plan)
-    const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "";
+    const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "";
     const { error: profileError } = await adminClient.from("profiles").insert({
       user_id: user.id,
       display_name: displayName,
