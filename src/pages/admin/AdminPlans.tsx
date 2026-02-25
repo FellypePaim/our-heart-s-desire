@@ -136,9 +136,15 @@ const AdminPlans = () => {
     if (!renewUser || !user) return;
     setRenewSaving(true);
     try {
-      const newExpiry = typeof daysOrDate === "number"
-        ? addDays(new Date(), daysOrDate).toISOString()
-        : new Date(daysOrDate + "T23:59:59").toISOString();
+      let newExpiry: string;
+      if (typeof daysOrDate === "number") {
+        // If plan is still active, extend from current expiration; otherwise from now
+        const currentExpiry = new Date(renewUser.planExpiresAt);
+        const base = currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
+        newExpiry = addDays(base, daysOrDate).toISOString();
+      } else {
+        newExpiry = new Date(daysOrDate + "T23:59:59").toISOString();
+      }
 
       const { error } = await supabase
         .from("profiles")

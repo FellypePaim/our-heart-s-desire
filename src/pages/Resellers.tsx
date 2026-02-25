@@ -592,7 +592,11 @@ const Resellers = () => {
                 if (!renewingReseller || !user) return;
                 setRenewSaving(true);
                 try {
-                  const newExpiry = new Date();
+                  // If plan is still active, extend from current expiration; otherwise from now
+                  const currentPlan = planMap.get(renewingReseller.owner_user_id);
+                  const currentExpiry = currentPlan?.plan_expires_at ? new Date(currentPlan.plan_expires_at) : null;
+                  const base = currentExpiry && currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
+                  const newExpiry = new Date(base);
                   newExpiry.setDate(newExpiry.getDate() + 30);
                   const { error } = await supabase
                     .from("profiles")
