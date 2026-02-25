@@ -3,7 +3,6 @@ project_id = "iuhndtwhvfbpswbeekht"
 [functions.cron-whatsapp-reminders]
 enabled = true
 verify_jwt = true
-entrypoint = "./functions/cron-whatsapp-reminders/index.ts"
 
 [functions.create-user]
 enabled = true
