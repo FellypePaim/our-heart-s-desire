@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound, ShieldCheck, Store } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 
 const Auth = () => {
@@ -12,6 +12,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"panel_admin" | "reseller">("panel_admin");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -34,8 +35,27 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { selected_role: selectedRole },
+          },
+        });
         if (error) throw error;
+
+        // If email confirmation is required, user won't have a session yet
+        if (data.session) {
+          // Auto-confirmed: setup role immediately
+          try {
+            await supabase.functions.invoke("self-register", {
+              body: { role: selectedRole },
+            });
+          } catch (regErr: any) {
+            console.error("Self-register error:", regErr);
+          }
+        }
+
         toast({
           title: "Conta criada!",
           description: "Verifique seu e-mail para confirmar o cadastro.",
@@ -99,8 +119,6 @@ const Auth = () => {
 
       {/* Right panel - form */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-
-        {/* Abstract background blur orbs */}
         <div className="absolute top-1/4 -right-32 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-60 pointer-events-none" />
         <div className="absolute -bottom-32 left-1/4 w-[500px] h-[500px] bg-secondary/30 rounded-full blur-[120px] opacity-60 pointer-events-none" />
 
@@ -122,13 +140,54 @@ const Auth = () => {
             </h2>
             <p className="text-sm text-muted-foreground">
               {mode === "login" && "Acesse seu painel operacional"}
-              {mode === "signup" && "Preencha os dados para começar"}
+              {mode === "signup" && "Escolha seu perfil e comece a testar"}
               {mode === "forgot" && "Enviaremos um link para seu e-mail"}
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Role selection - only on signup */}
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Tipo de conta
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole("panel_admin")}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-sm ${
+                      selectedRole === "panel_admin"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <ShieldCheck className="h-5 w-5" />
+                    <span className="font-semibold">Master</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      Gerencie revendedores
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole("reseller")}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-sm ${
+                      selectedRole === "reseller"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <Store className="h-5 w-5" />
+                    <span className="font-semibold">Revendedor</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      Gerencie clientes
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 E-mail

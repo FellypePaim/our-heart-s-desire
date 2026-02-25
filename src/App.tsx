@@ -1,12 +1,15 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { PlanExpiredGuard } from "@/components/PlanExpiredGuard";
+import { TrialWelcomeModal } from "@/components/TrialWelcomeModal";
 import { AIChatWidget } from "@/components/AIChatWidget";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -45,7 +48,18 @@ function RequireRole({ roles: allowedRoles, children }: { roles: string[]; child
 }
 
 function ProtectedLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, user, roles } = useAuth();
+
+  // On first login after email confirmation, setup role if missing
+  useEffect(() => {
+    if (!user || roles.length > 0) return;
+    const selectedRole = user.user_metadata?.selected_role;
+    if (selectedRole && (selectedRole === "panel_admin" || selectedRole === "reseller")) {
+      supabase.functions.invoke("self-register", {
+        body: { role: selectedRole },
+      }).catch((err) => console.error("Self-register error:", err));
+    }
+  }, [user, roles]);
 
   if (loading) {
     return (
@@ -84,6 +98,7 @@ function ProtectedLayout() {
         <MobileBottomNav />
         <CommandPalette />
         <AIChatWidget />
+        <TrialWelcomeModal />
       </div>
     </PlanExpiredGuard>
   );
