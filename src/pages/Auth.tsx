@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Radar, Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, LogIn, KeyRound } from "lucide-react";
+import logoBrave from "@/assets/logo-brave.png";
 
 const Auth = () => {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
@@ -63,8 +64,8 @@ const Auth = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-              <Radar className="h-5 w-5 text-sidebar-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary p-1">
+              <img src={logoBrave} alt="Brave Gestor" className="h-full w-full object-contain" />
             </div>
             <span className="text-xl font-bold tracking-tight text-sidebar-primary">Brave Gestor</span>
           </div>
@@ -106,8 +107,8 @@ const Auth = () => {
         <div className="relative z-10 w-full max-w-sm space-y-8 p-8 glass rounded-2xl shadow-xl">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 justify-center mb-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">
-              <Radar className="h-6 w-6 text-primary-foreground" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary p-1">
+              <img src={logoBrave} alt="Brave Gestor" className="h-full w-full object-contain" />
             </div>
             <span className="text-xl font-bold tracking-tight">Brave Gestor</span>
           </div>
