@@ -12,6 +12,7 @@ import { ResellerMetrics } from "@/components/radar/ResellerMetrics";
 import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
 import { OperationalLimits } from "@/components/OperationalLimits";
+import { DailyTips } from "@/components/DailyTips";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
@@ -69,6 +70,9 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      {/* Daily Tips */}
+      <DailyTips clients={clients || []} />
 
       {/* Tabs */}
       <Tabs defaultValue="clients" className="flex-1 flex flex-col overflow-hidden">
