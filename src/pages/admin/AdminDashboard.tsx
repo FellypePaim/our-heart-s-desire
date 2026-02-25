@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGlobalStats, useAllClients, useAllUserRoles } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getStatusFromDate, getAllStatuses } from "@/lib/status";
 import {
   Globe, Users, UserCheck, AlertTriangle, TrendingDown,
-  DollarSign, BarChart3, Crown, Store, TrendingUp, Clock
+  DollarSign, BarChart3, Crown, Store, TrendingUp, Clock, Trophy
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip, Legend, CartesianGrid
@@ -50,6 +51,67 @@ const AdminDashboard = () => {
   const { data: allClients } = useAllClients();
   const { data: allRoles } = useAllUserRoles();
   const { data: allResellers } = useAllResellers();
+  const [rankingPeriod, setRankingPeriod] = useState<"week" | "month">("month");
+
+  // Fetch profiles for resolving user names
+  const [profileMap, setProfileMap] = useState<Map<string, string>>(new Map());
+  const { data: profiles } = useQuery({
+    queryKey: ["admin_profiles"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("get-user-profiles");
+      if (error) throw error;
+      return data as { id: string; name: string; email: string }[];
+    },
+    enabled: isSuperAdmin,
+  });
+
+  const resolvedProfileMap = useMemo(() => {
+    const map = new Map<string, string>();
+    profiles?.forEach((p) => map.set(p.id, p.name || p.email?.split("@")[0] || p.id.slice(0, 8)));
+    return map;
+  }, [profiles]);
+
+  const getProfileName = (userId: string) => resolvedProfileMap.get(userId) || userId.slice(0, 8);
+
+  // Reseller map for resolving reseller names
+  const resellerById = useMemo(() => {
+    const map = new Map<string, { display_name: string; owner_user_id: string }>();
+    allResellers?.forEach((r: any) => map.set(r.id, { display_name: r.display_name, owner_user_id: r.owner_user_id }));
+    return map;
+  }, [allResellers]);
+
+  // Top 5 ranking: who added the most clients in the period
+  const ranking = useMemo(() => {
+    if (!allClients) return [];
+    const now = new Date();
+    const cutoff = new Date();
+    if (rankingPeriod === "week") cutoff.setDate(now.getDate() - 7);
+    else cutoff.setMonth(now.getMonth() - 1);
+
+    const counts: Record<string, { name: string; count: number }> = {};
+    allClients.forEach((c) => {
+      const created = new Date(c.created_at);
+      if (created < cutoff) return;
+
+      // Determine who added: if reseller_id, credit the reseller; otherwise credit user_id (master)
+      let ownerId = c.user_id;
+      let ownerName = getProfileName(c.user_id);
+      if (c.reseller_id) {
+        const res = resellerById.get(c.reseller_id);
+        if (res) {
+          ownerId = res.owner_user_id;
+          ownerName = res.display_name;
+        }
+      }
+
+      if (!counts[ownerId]) counts[ownerId] = { name: ownerName, count: 0 };
+      counts[ownerId].count++;
+    });
+
+    return Object.values(counts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [allClients, rankingPeriod, resellerById, resolvedProfileMap]);
 
   const roleCounts = useMemo(() => {
     if (!allRoles) return { masters: 0, resellers: 0, users: 0 };
@@ -265,6 +327,55 @@ const AdminDashboard = () => {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-yellow-500" />
+              Top 5 — Mais Clientes Adicionados
+            </CardTitle>
+            <Select value={rankingPeriod} onValueChange={(v: "week" | "month") => setRankingPeriod(v)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Semanal</SelectItem>
+                <SelectItem value="month">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent>
+            {ranking.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente adicionado neste período</p>
+            ) : (
+              <div className="space-y-3">
+                {ranking.map((entry, i) => {
+                  const medals = ["🥇", "🥈", "🥉"];
+                  const medal = i < 3 ? medals[i] : `${i + 1}º`;
+                  const maxCount = ranking[0].count;
+                  const pct = maxCount > 0 ? (entry.count / maxCount) * 100 : 0;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-lg w-8 text-center shrink-0">{medal}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium truncate">{entry.name}</span>
+                          <span className="text-sm font-mono font-semibold text-primary ml-2">{entry.count}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
