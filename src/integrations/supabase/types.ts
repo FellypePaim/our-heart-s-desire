@@ -387,6 +387,10 @@ export type Database = {
       is_master_plan_active: { Args: { _user_id: string }; Returns: boolean }
       is_panel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_plan_active: { Args: { _user_id: string }; Returns: boolean }
+      is_reseller_of_master: {
+        Args: { _master_user_id: string; _reseller_user_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
