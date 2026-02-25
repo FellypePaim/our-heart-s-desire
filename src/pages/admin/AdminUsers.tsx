@@ -267,12 +267,13 @@ const AdminUsers = () => {
         if (ownerUserIds) {
           const ownerOption = ownerOptions.find((o) => o.id === filterOwner);
           let matches = false;
-          if (c.user_id === filterOwner) matches = true;
-          if (c.reseller_id) {
-            const resellerRecord = resellers?.find((r) => r.id === c.reseller_id);
-            if (resellerRecord && resellerRecord.owner_user_id === filterOwner) matches = true;
-            // If filtering by master, also include clients of resellers created by that master
-            if (ownerOption?.type === "master" && resellerRecord && resellerRecord.created_by === filterOwner) matches = true;
+          if (ownerOption?.type === "master") {
+            // Only show clients directly owned by this master (not via resellers)
+            matches = c.user_id === filterOwner && !c.reseller_id;
+          } else if (ownerOption?.type === "reseller") {
+            // Show clients belonging to this reseller
+            const resellerRecord = resellers?.find((r) => r.owner_user_id === filterOwner);
+            matches = !!resellerRecord && c.reseller_id === resellerRecord.id;
           }
           if (!matches) return;
         }
