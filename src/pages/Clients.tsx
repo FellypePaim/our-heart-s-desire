@@ -43,7 +43,7 @@ const Clients = () => {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [ownershipFilter, setOwnershipFilter] = useState<string>("mine");
+  
   const [resellerFilter, setResellerFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -66,9 +66,6 @@ const Clients = () => {
     if (!clients) return [];
     let result = clients;
 
-    if (ownershipFilter === "mine") {
-      result = result.filter((c) => c.user_id === user?.id);
-    }
     if ((isPanelAdmin || isSuperAdmin) && resellerFilter !== "all") {
       result = result.filter((c) => c.reseller_id === resellerFilter);
     }
@@ -85,9 +82,9 @@ const Clients = () => {
       );
     }
     return result;
-  }, [clients, search, ownershipFilter, resellerFilter, isPanelAdmin, isSuperAdmin, user?.id]);
+  }, [clients, search, resellerFilter, isPanelAdmin, isSuperAdmin]);
 
-  useEffect(() => { setPage(1); }, [search, ownershipFilter, resellerFilter]);
+  useEffect(() => { setPage(1); }, [search, resellerFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -208,15 +205,6 @@ const Clients = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, telefone, plano, servidor..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="mine">Meus Clientes Finais</SelectItem>
-            <SelectItem value="all">Todos os Clientes</SelectItem>
-          </SelectContent>
-        </Select>
         {(isPanelAdmin || isSuperAdmin) && resellers && resellers.length > 0 && (
           <Select value={resellerFilter} onValueChange={setResellerFilter}>
             <SelectTrigger className="w-[200px]">
