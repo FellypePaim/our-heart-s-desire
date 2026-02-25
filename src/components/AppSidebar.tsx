@@ -116,7 +116,7 @@ export function AppSidebar() {
         </kbd>
       </button>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto p-3">
         {isSuperAdmin && (
           <>
             <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">

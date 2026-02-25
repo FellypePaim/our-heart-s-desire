@@ -57,7 +57,7 @@ function ProtectedLayout() {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar />
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 overflow-auto flex flex-col min-h-0">
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/clients" element={<Clients />} />
