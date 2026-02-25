@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { useClients } from "@/hooks/useClients";
-import { useResellers } from "@/hooks/useResellers";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 import { getStatusFromDate } from "@/lib/status";
@@ -11,7 +10,7 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -38,13 +37,13 @@ const Clients = () => {
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
-  const { data: resellers } = useResellers();
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   
-  const [resellerFilter, setResellerFilter] = useState<string>("all");
+  
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [messageClient, setMessageClient] = useState<Client | null>(null);
@@ -56,35 +55,23 @@ const Clients = () => {
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const resellerMap = useMemo(() => {
-    const map = new Map<string, string>();
-    resellers?.forEach(r => map.set(r.id, r.display_name));
-    return map;
-  }, [resellers]);
 
   const filtered = useMemo(() => {
     if (!clients) return [];
-    let result = clients;
+    if (!search) return clients;
+    const q = search.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone?.includes(q) ||
+        (c.plan || "").toLowerCase().includes(q) ||
+        (c.servidor || "").toLowerCase().includes(q) ||
+        (c.aplicativo || "").toLowerCase().includes(q) ||
+        (c.captacao || "").toLowerCase().includes(q)
+    );
+  }, [clients, search]);
 
-    if ((isPanelAdmin || isSuperAdmin) && resellerFilter !== "all") {
-      result = result.filter((c) => c.reseller_id === resellerFilter);
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.phone?.includes(q) ||
-          (c.plan || "").toLowerCase().includes(q) ||
-          (c.servidor || "").toLowerCase().includes(q) ||
-          (c.aplicativo || "").toLowerCase().includes(q) ||
-          (c.captacao || "").toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [clients, search, resellerFilter, isPanelAdmin, isSuperAdmin]);
-
-  useEffect(() => { setPage(1); }, [search, resellerFilter]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -162,14 +149,6 @@ const Clients = () => {
     }
   };
 
-  const getCreatorName = (client: Client) => {
-    if (client.reseller_id) {
-      return resellerMap.get(client.reseller_id) || "-";
-    }
-    return "-";
-  };
-
-  const showCreator = isPanelAdmin || isSuperAdmin;
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -205,19 +184,6 @@ const Clients = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, telefone, plano, servidor..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        {(isPanelAdmin || isSuperAdmin) && resellers && resellers.length > 0 && (
-          <Select value={resellerFilter} onValueChange={setResellerFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filtrar revendedor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os revendedores</SelectItem>
-              {resellers.map((r) => (
-                <SelectItem key={r.id} value={r.id}>{r.display_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       <div className="rounded-lg border bg-card overflow-x-auto">
@@ -229,18 +195,17 @@ const Clients = () => {
               <TableHead>Plano</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
-              {showCreator && <TableHead>#Criador</TableHead>}
               <TableHead>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={showCreator ? 7 : 6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showCreator ? 7 : 6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
               </TableRow>
             ) : (
               paged.map((client) => {
@@ -254,9 +219,6 @@ const Clients = () => {
                       {format(new Date(client.expiration_date + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
                     <TableCell><StatusBadge status={status} size="sm" /></TableCell>
-                    {showCreator && (
-                      <TableCell className="text-sm text-muted-foreground">{getCreatorName(client)}</TableCell>
-                    )}
                     <TableCell>
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }} title="Editar">
