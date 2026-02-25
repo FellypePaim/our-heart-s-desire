@@ -205,6 +205,7 @@ const AdminUsers = () => {
     displayName: string;
     source: "role" | "client";
     clientPhone?: string | null;
+    ownerName: string;
   };
 
   const filteredRoles = useMemo(() => {
@@ -220,6 +221,12 @@ const AdminUsers = () => {
           const name = getUserName(r.user_id).toLowerCase();
           if (!name.includes(q) && !r.user_id.toLowerCase().includes(q)) return;
         }
+        // Determine owner for this user
+        let ownerName = "—";
+        if (r.role === "reseller") {
+          const resellerRecord = resellers?.find((res) => res.owner_user_id === r.user_id);
+          if (resellerRecord?.created_by) ownerName = getUserName(resellerRecord.created_by);
+        }
         rows.push({
           id: r.id,
           user_id: r.user_id,
@@ -228,6 +235,7 @@ const AdminUsers = () => {
           created_at: r.created_at,
           displayName: getUserName(r.user_id),
           source: "role",
+          ownerName,
         });
       });
     }
@@ -252,6 +260,12 @@ const AdminUsers = () => {
           const q = search.toLowerCase();
           if (!c.name.toLowerCase().includes(q) && !(c.phone || "").toLowerCase().includes(q)) return;
         }
+        // Determine owner name for client
+        let ownerName = getUserName(c.user_id);
+        if (c.reseller_id) {
+          const resellerRecord = resellers?.find((r) => r.id === c.reseller_id);
+          if (resellerRecord) ownerName = resellerRecord.display_name;
+        }
         rows.push({
           id: `client_${c.id}`,
           user_id: c.user_id,
@@ -261,6 +275,7 @@ const AdminUsers = () => {
           displayName: c.name,
           source: "client",
           clientPhone: c.phone,
+          ownerName,
         });
       });
     }
@@ -268,6 +283,7 @@ const AdminUsers = () => {
     return allSort.sortFn(rows, (item, key) => {
       if (key === "name") return item.displayName;
       if (key === "role") return roleLabels[item.role] || item.role;
+      if (key === "owner") return item.ownerName;
       if (key === "status") return item.is_active ? "Ativo" : "Bloqueado";
       if (key === "created_at") return item.created_at;
       return (item as any)[key];
@@ -526,6 +542,7 @@ const AdminUsers = () => {
             <TableRow>
               <SortableHead label="Nome" sortKey="name" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Cargo" sortKey="role" sort={allSort.sort} onSort={allSort.toggle} />
+              <SortableHead label="Proprietário" sortKey="owner" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
               <SortableHead label="Status" sortKey="status" sort={allSort.sort} onSort={allSort.toggle} />
               <SortableHead label="Data" sortKey="created_at" sort={allSort.sort} onSort={allSort.toggle} className="hidden md:table-cell" />
               <TableHead>Ações</TableHead>
@@ -533,9 +550,9 @@ const AdminUsers = () => {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : filteredRoles.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell></TableRow>
             ) : (
               pagedRoles.map((r) => {
                 const canAct = r.source === "role" && canActOn(r.role);
@@ -546,6 +563,9 @@ const AdminUsers = () => {
                       <Badge variant={r.role === "super_admin" ? "default" : "secondary"}>
                         {roleLabels[r.role] || r.role}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {hidden ? "••••••••" : r.ownerName}
                     </TableCell>
                     <TableCell>
                       <Badge variant={r.is_active ? "default" : "destructive"}>
