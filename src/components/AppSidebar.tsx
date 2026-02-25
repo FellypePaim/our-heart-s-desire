@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut,
-  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText
+  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search
 } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,21 @@ export function AppSidebar() {
           <X className="h-5 w-5" />
         </button>
       </div>
+
+      {/* Search trigger */}
+      <button
+        onClick={() => {
+          setMobileOpen(false);
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+        }}
+        className="mx-3 mb-2 flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-primary transition-colors"
+      >
+        <Search className="h-4 w-4" />
+        <span className="flex-1 text-left">Buscar...</span>
+        <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-sidebar-border bg-sidebar px-1.5 font-mono text-[10px] text-sidebar-foreground/40">
+          ⌘K
+        </kbd>
+      </button>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {isSuperAdmin && (
