@@ -150,6 +150,7 @@ function ProtectedLayout() {
           </main>
         </div>
         
+        <MobileBottomNav />
         <CommandPalette />
         <AIChatWidget />
         <TrialWelcomeModal />
