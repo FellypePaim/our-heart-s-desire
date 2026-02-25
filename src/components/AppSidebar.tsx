@@ -3,9 +3,10 @@ import { useTheme } from "@/hooks/useTheme";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Users, MessageSquare, Settings, LogOut, Radar,
+  LayoutDashboard, Users, MessageSquare, Settings, LogOut,
   Crown, Shield, Globe, Moon, Sun, Menu, X, Server
 } from "lucide-react";
+import logoBrave from "@/assets/logo-brave.png";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -81,8 +82,8 @@ export function AppSidebar() {
   const sidebarContent = (
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Radar className="h-5 w-5 text-sidebar-primary-foreground" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary p-1">
+          <img src={logoBrave} alt="Brave Gestor" className="h-full w-full object-contain" />
         </div>
         <div className="min-w-0">
           <h1 className="font-bold text-sm text-sidebar-primary">Brave Gestor</h1>
