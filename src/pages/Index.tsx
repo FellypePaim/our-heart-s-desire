@@ -16,6 +16,7 @@ import { DailyTips } from "@/components/DailyTips";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const Index = () => {
   const { data: clients, isLoading } = useClients({ ownOnly: true });
@@ -57,6 +58,7 @@ const Index = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell clients={clients || []} onClientClick={setSelectedClient} />
             <Button
               variant="outline"
               size="icon"
