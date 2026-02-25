@@ -86,6 +86,7 @@ const Resellers = () => {
 
   useEffect(() => {
     const fetchProfiles = async () => {
+      if (!isSuperAdmin) return; // Only super_admin can call get-user-profiles
       try {
         const { data, error } = await supabase.functions.invoke("get-user-profiles");
         if (error) throw error;
