@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle, Download, FileText, FileSpreadsheet, RefreshCw, Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLimitCheck } from "@/hooks/useLimitCheck";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -70,6 +70,11 @@ const Resellers = () => {
   const [deletingReseller, setDeletingReseller] = useState<Reseller | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewingReseller, setRenewingReseller] = useState<Reseller | null>(null);
+  const [renewDate, setRenewDate] = useState("");
+  const [renewSaving, setRenewSaving] = useState(false);
+
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
 
@@ -78,7 +83,6 @@ const Resellers = () => {
   const { canCreateReseller, resellerLimitMsg } = useLimitCheck();
 
   useEffect(() => {
-    if (!isSuperAdmin) return;
     const fetchProfiles = async () => {
       try {
         const { data, error } = await supabase.functions.invoke("get-user-profiles");
@@ -89,12 +93,13 @@ const Resellers = () => {
       }
     };
     fetchProfiles();
-  }, [isSuperAdmin]);
+  }, []);
 
-  const getOwnerName = (ownerUserId: string) => {
-    if (ownerUserId === user?.id) return "Eu";
-    const p = profileMap.get(ownerUserId);
-    return p?.name || p?.email?.split("@")[0] || ownerUserId.slice(0, 8);
+  const getCreatorName = (createdBy: string | null) => {
+    if (!createdBy) return "—";
+    if (createdBy === user?.id) return "Eu";
+    const p = profileMap.get(createdBy);
+    return p?.name || p?.email?.split("@")[0] || createdBy.slice(0, 8);
   };
 
   if (!loading && !isPanelAdmin && !isSuperAdmin) return <Navigate to="/" replace />;
@@ -378,12 +383,19 @@ const Resellers = () => {
                     {r.limits?.max_clients || "∞"} clientes / {r.limits?.max_messages_month || "∞"} msg
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {getOwnerName(r.owner_user_id)}
+                    {getCreatorName(r.created_by)}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(r)} title="Editar">
                         <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        setRenewingReseller(r);
+                        setRenewDate("");
+                        setRenewOpen(true);
+                      }} title="Renovar plano">
+                        <RefreshCw className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -518,6 +530,80 @@ const Resellers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Renew Reseller Dialog */}
+      <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renovar Plano do Revendedor</DialogTitle>
+            <DialogDescription>
+              Renove o plano de <strong>{renewingReseller?.display_name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              disabled={renewSaving}
+              onClick={async () => {
+                if (!renewingReseller || !user) return;
+                setRenewSaving(true);
+                try {
+                  const newExpiry = new Date();
+                  newExpiry.setDate(newExpiry.getDate() + 30);
+                  const { error } = await supabase
+                    .from("profiles")
+                    .update({ plan_type: "monthly", plan_expires_at: newExpiry.toISOString() })
+                    .eq("user_id", renewingReseller.owner_user_id);
+                  if (error) throw error;
+                  await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { days: 30 });
+                  toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado por +30 dias.` });
+                  setRenewOpen(false);
+                } catch (e: any) {
+                  toast({ title: "Erro", description: e.message, variant: "destructive" });
+                } finally {
+                  setRenewSaving(false);
+                }
+              }}
+            >
+              <Calendar className="h-4 w-4" />
+              Renovar +30 dias
+            </Button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex-1 h-px bg-border" />
+              ou selecione a data
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="flex gap-2">
+              <Input type="date" value={renewDate} onChange={(e) => setRenewDate(e.target.value)} className="flex-1" />
+              <Button
+                disabled={!renewDate || renewSaving}
+                onClick={async () => {
+                  if (!renewingReseller || !user || !renewDate) return;
+                  setRenewSaving(true);
+                  try {
+                    const expiry = new Date(renewDate + "T23:59:59");
+                    const { error } = await supabase
+                      .from("profiles")
+                      .update({ plan_type: "monthly", plan_expires_at: expiry.toISOString() })
+                      .eq("user_id", renewingReseller.owner_user_id);
+                    if (error) throw error;
+                    await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { date: renewDate });
+                    toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado até ${renewDate}.` });
+                    setRenewOpen(false);
+                  } catch (e: any) {
+                    toast({ title: "Erro", description: e.message, variant: "destructive" });
+                  } finally {
+                    setRenewSaving(false);
+                  }
+                }}
+              >
+                {renewSaving ? "Salvando..." : "Renovar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
