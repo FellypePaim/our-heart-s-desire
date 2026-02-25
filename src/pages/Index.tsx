@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Radar, Eye, EyeOff, Users, Store, BarChart3, TrendingUp } from "lucide-react";
 
 const Index = () => {
-  const { data: clients, isLoading } = useClients();
+  const { data: clients, isLoading } = useClients({ ownOnly: true });
   const { roles } = useAuth();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const { hidden, toggle, mask } = usePrivacyMode();
