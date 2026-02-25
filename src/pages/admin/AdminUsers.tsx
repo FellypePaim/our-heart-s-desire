@@ -160,20 +160,34 @@ const AdminUsers = () => {
     return roleRank[targetRole] < roleRank["super_admin"];
   }, []);
 
-  // Build owner options: masters and resellers
+  // Build owner options: masters and resellers with counts
   const ownerOptions = useMemo(() => {
     const options: { id: string; label: string; type: "master" | "reseller" }[] = [];
+
+    // Count direct clients per master and per reseller
+    const masterDirectCount: Record<string, number> = {};
+    const resellerCount: Record<string, number> = {};
+    (allClients || []).forEach((c) => {
+      if (!c.reseller_id) {
+        masterDirectCount[c.user_id] = (masterDirectCount[c.user_id] || 0) + 1;
+      } else {
+        resellerCount[c.reseller_id] = (resellerCount[c.reseller_id] || 0) + 1;
+      }
+    });
+
     // Masters (panel_admin)
     const masters = roles?.filter((r) => r.role === "panel_admin") || [];
     masters.forEach((m) => {
-      options.push({ id: m.user_id, label: `👤 ${getUserName(m.user_id)} (Master)`, type: "master" });
+      const count = masterDirectCount[m.user_id] || 0;
+      options.push({ id: m.user_id, label: `👤 ${getUserName(m.user_id)} (Master) · ${count}`, type: "master" });
     });
     // Resellers
     resellers?.forEach((r) => {
-      options.push({ id: r.owner_user_id, label: `🏪 ${r.display_name} (Revenda)`, type: "reseller" });
+      const count = resellerCount[r.id] || 0;
+      options.push({ id: r.owner_user_id, label: `🏪 ${r.display_name} (Revenda) · ${count}`, type: "reseller" });
     });
     return options;
-  }, [roles, resellers, getUserName]);
+  }, [roles, resellers, allClients, getUserName]);
 
   // Build set of user_ids that belong to a selected owner
   const ownerUserIds = useMemo(() => {
