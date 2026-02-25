@@ -23,7 +23,7 @@ interface ResellerMetricsProps {
 
 export function ResellerMetrics({ mask }: ResellerMetricsProps) {
   const { data: resellers, isLoading } = useResellers();
-  const { data: clients } = useClients();
+  const { data: clients } = useClients({ ownOnly: true });
 
   const chartData = useMemo(() => {
     if (!resellers || resellers.length === 0) return { clientDist: [], revenueDist: [], statusDist: [] };
