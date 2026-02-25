@@ -157,14 +157,16 @@ const ServiceConfig = () => {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="plan">Planos</TabsTrigger>
-          <TabsTrigger value="server">Servidores</TabsTrigger>
-          <TabsTrigger value="app">Aplicativos</TabsTrigger>
-          <TabsTrigger value="device">Dispositivos</TabsTrigger>
-          <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
-          <TabsTrigger value="captacao">Captação</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <TabsList className="w-max">
+            <TabsTrigger value="plan">Planos</TabsTrigger>
+            <TabsTrigger value="server">Servidores</TabsTrigger>
+            <TabsTrigger value="app">Aplicativos</TabsTrigger>
+            <TabsTrigger value="device">Dispositivos</TabsTrigger>
+            <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
+            <TabsTrigger value="captacao">Captação</TabsTrigger>
+          </TabsList>
+        </div>
 
         {["plan", "server", "app", "device", "pagamento", "captacao"].map((cat) => (
           <TabsContent key={cat} value={cat}>
