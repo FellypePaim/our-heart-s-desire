@@ -97,6 +97,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Create profile with trial plan (trigger will set plan_expires_at)
+    await adminClient.from("profiles").insert({
+      user_id: newUser.user.id,
+      display_name: name || email.split("@")[0],
+    });
+
     // If creating a reseller, also create the reseller record
     if (role === "reseller") {
       await adminClient.from("resellers").insert({
