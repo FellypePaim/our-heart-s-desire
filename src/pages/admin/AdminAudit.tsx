@@ -34,7 +34,8 @@ const actionLabels: Record<string, string> = {
   user_unblocked: "Usuário desbloqueado",
   user_role_deleted: "Cargo removido",
   role_changed: "Cargo alterado",
-
+  reseller_plan_renewed: "Plano de revendedor renovado",
+  plan_renewed_by_admin: "Plano renovado pelo admin",
 };
 
 const AdminAudit = () => {
