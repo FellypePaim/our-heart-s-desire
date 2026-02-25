@@ -217,6 +217,8 @@ export type Database = {
           display_name: string | null
           id: string
           limits: Json
+          plan_expires_at: string
+          plan_type: string
           updated_at: string
           user_id: string
         }
@@ -226,6 +228,8 @@ export type Database = {
           display_name?: string | null
           id?: string
           limits?: Json
+          plan_expires_at?: string
+          plan_type?: string
           updated_at?: string
           user_id: string
         }
@@ -235,6 +239,8 @@ export type Database = {
           display_name?: string | null
           id?: string
           limits?: Json
+          plan_expires_at?: string
+          plan_type?: string
           updated_at?: string
           user_id?: string
         }
@@ -378,7 +384,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_master_plan_active: { Args: { _user_id: string }; Returns: boolean }
       is_panel_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_plan_active: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {

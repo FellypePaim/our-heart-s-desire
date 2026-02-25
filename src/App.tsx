@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
+import { PlanExpiredGuard } from "@/components/PlanExpiredGuard";
 import { AIChatWidget } from "@/components/AIChatWidget";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -55,31 +56,33 @@ function ProtectedLayout() {
   if (!session) return <Navigate to="/auth" replace />;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <div className="flex flex-1 overflow-hidden">
-        <AppSidebar />
-        <main className="flex-1 overflow-auto flex flex-col min-h-0 pb-14 lg:pb-0">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/resellers" element={<RequireRole roles={["panel_admin", "super_admin"]}><Resellers /></RequireRole>} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/service-config" element={<ServiceConfig />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/admin" element={<RequireSuperAdmin><AdminDashboard /></RequireSuperAdmin>} />
-            <Route path="/admin/users" element={<RequireSuperAdmin><AdminUsers /></RequireSuperAdmin>} />
-            <Route path="/admin/settings" element={<RequireSuperAdmin><AdminSettings /></RequireSuperAdmin>} />
-            <Route path="/admin/services" element={<RequireSuperAdmin><AdminServiceConfig /></RequireSuperAdmin>} />
-            <Route path="/admin/audit" element={<RequireSuperAdmin><AdminAudit /></RequireSuperAdmin>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </main>
+    <PlanExpiredGuard>
+      <div className="flex flex-col h-screen overflow-hidden bg-background">
+        <div className="flex flex-1 overflow-hidden">
+          <AppSidebar />
+          <main className="flex-1 overflow-auto flex flex-col min-h-0 pb-14 lg:pb-0">
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/resellers" element={<RequireRole roles={["panel_admin", "super_admin"]}><Resellers /></RequireRole>} />
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/service-config" element={<ServiceConfig />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/admin" element={<RequireSuperAdmin><AdminDashboard /></RequireSuperAdmin>} />
+              <Route path="/admin/users" element={<RequireSuperAdmin><AdminUsers /></RequireSuperAdmin>} />
+              <Route path="/admin/settings" element={<RequireSuperAdmin><AdminSettings /></RequireSuperAdmin>} />
+              <Route path="/admin/services" element={<RequireSuperAdmin><AdminServiceConfig /></RequireSuperAdmin>} />
+              <Route path="/admin/audit" element={<RequireSuperAdmin><AdminAudit /></RequireSuperAdmin>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+        </div>
+        <MobileBottomNav />
+        <CommandPalette />
+        <AIChatWidget />
       </div>
-      <MobileBottomNav />
-      <CommandPalette />
-      <AIChatWidget />
-    </div>
+    </PlanExpiredGuard>
   );
 }
 
