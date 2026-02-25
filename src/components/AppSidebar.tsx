@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut,
-  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search
+  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search, CreditCard
 } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function AppSidebar() {
   const superAdminItems = [
     { to: "/admin", label: "Dashboard Global", icon: Globe },
     { to: "/admin/users", label: "Usuários (Todos)", icon: Shield },
+    { to: "/admin/plans", label: "Gestão de Planos", icon: CreditCard },
     { to: "/admin/services", label: "Serviços Globais", icon: Server },
     { to: "/admin/audit", label: "Log de Atividades", icon: Crown },
   ];

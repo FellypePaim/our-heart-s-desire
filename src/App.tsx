@@ -22,6 +22,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAudit from "./pages/admin/AdminAudit";
 import AdminServiceConfig from "./pages/admin/AdminServiceConfig";
+import AdminPlans from "./pages/admin/AdminPlans";
 import ServiceConfig from "./pages/ServiceConfig";
 import Reports from "./pages/Reports";
 
@@ -72,7 +73,8 @@ function ProtectedLayout() {
               <Route path="/admin" element={<RequireSuperAdmin><AdminDashboard /></RequireSuperAdmin>} />
               <Route path="/admin/users" element={<RequireSuperAdmin><AdminUsers /></RequireSuperAdmin>} />
               <Route path="/admin/settings" element={<RequireSuperAdmin><AdminSettings /></RequireSuperAdmin>} />
-              <Route path="/admin/services" element={<RequireSuperAdmin><AdminServiceConfig /></RequireSuperAdmin>} />
+            <Route path="/admin/services" element={<RequireSuperAdmin><AdminServiceConfig /></RequireSuperAdmin>} />
+            <Route path="/admin/plans" element={<RequireSuperAdmin><AdminPlans /></RequireSuperAdmin>} />
               <Route path="/admin/audit" element={<RequireSuperAdmin><AdminAudit /></RequireSuperAdmin>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
