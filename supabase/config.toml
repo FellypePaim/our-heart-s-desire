@@ -11,3 +11,7 @@ verify_jwt = false
 [functions.get-user-profiles]
 enabled = true
 verify_jwt = false
+
+[functions.ai-chat]
+enabled = true
+verify_jwt = false

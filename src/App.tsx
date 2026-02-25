@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AIChatWidget } from "@/components/AIChatWidget";
 import Index from "./pages/Index";
 import Clients from "./pages/Clients";
 import Resellers from "./pages/Resellers";
@@ -71,6 +72,7 @@ function ProtectedLayout() {
           </Routes>
         </main>
       </div>
+      <AIChatWidget />
     </div>
   );
 }
