@@ -32,7 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 const ITEMS_PER_PAGE = 20;
 
 const Clients = () => {
-  const { data: clients, isLoading } = useClients();
+  const { data: clients, isLoading } = useClients({ ownOnly: true });
   const { roles, user } = useAuth();
   const { hidden, toggle, mask } = usePrivacyMode();
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
