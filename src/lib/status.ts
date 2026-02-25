@@ -102,7 +102,10 @@ const STATUS_MAP: Record<StatusKey, Omit<StatusConfig, "key">> = {
 
 export function getStatusFromDate(expirationDate: string | Date): StatusConfig {
   const today = startOfDay(new Date());
-  const expDate = startOfDay(new Date(expirationDate));
+  // Parse date string as local time (not UTC) to avoid timezone offset issues
+  const expStr = typeof expirationDate === "string" ? expirationDate : expirationDate.toISOString();
+  const [year, month, day] = expStr.split("T")[0].split("-").map(Number);
+  const expDate = startOfDay(new Date(year, month - 1, day));
   const diff = differenceInDays(expDate, today);
 
   let key: StatusKey;
