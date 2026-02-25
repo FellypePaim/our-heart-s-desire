@@ -25,6 +25,7 @@ import AdminServiceConfig from "./pages/admin/AdminServiceConfig";
 import AdminPlans from "./pages/admin/AdminPlans";
 import ServiceConfig from "./pages/ServiceConfig";
 import Reports from "./pages/Reports";
+import PlanExpired from "./pages/PlanExpired";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +96,13 @@ function AuthRoute() {
   return <Auth />;
 }
 
+function PlanExpiredRoute() {
+  const { session, loading } = useAuth();
+  if (loading) return null;
+  if (!session) return <Navigate to="/auth" replace />;
+  return <PlanExpired />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -105,6 +113,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/plan-expired" element={<PlanExpiredRoute />} />
               <Route path="/*" element={<ProtectedLayout />} />
             </Routes>
           </BrowserRouter>

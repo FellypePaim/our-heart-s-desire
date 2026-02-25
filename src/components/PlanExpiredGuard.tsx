@@ -1,7 +1,7 @@
 import { usePlanStatus } from "@/hooks/usePlanStatus";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Clock, MessageCircle, AlertTriangle, Crown } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function formatTime(ms: number) {
@@ -11,13 +11,8 @@ function formatTime(ms: number) {
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
-const WHATSAPP_NUMBER = "5537991237543";
-const WHATSAPP_MESSAGE = encodeURIComponent(
-  "Olá! Gostei do sistema e gostaria de assinar um plano. Pode me ajudar?"
-);
-
 export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { data: plan, isLoading } = usePlanStatus();
   const [now, setNow] = useState(Date.now());
 
@@ -31,27 +26,9 @@ export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
   if (!user || isLoading || isSuperAdmin) return <>{children}</>;
   if (!plan) return <>{children}</>;
 
-  // Reseller whose master expired
-  if (plan.masterExpired) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Crown className="h-8 w-8 text-destructive" />
-          </div>
-          <h1 className="text-2xl font-bold">Acesso Bloqueado</h1>
-          <p className="text-muted-foreground">
-            O plano do seu administrador (Master) expirou. Seus serviços estão temporariamente suspensos até que ele renove o plano.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Entre em contato com seu administrador para solicitar a renovação.
-          </p>
-          <Button variant="outline" onClick={signOut}>
-            Sair
-          </Button>
-        </div>
-      </div>
-    );
+  // Expired or master expired → redirect to dedicated page
+  if (plan.isExpired || plan.masterExpired) {
+    return <Navigate to="/plan-expired" replace />;
   }
 
   // Trial active - show countdown banner + children
@@ -65,43 +42,6 @@ export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </>
-    );
-  }
-
-  // Plan expired (trial or monthly)
-  if (plan.isExpired) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
-          </div>
-          <h1 className="text-2xl font-bold">
-            {plan.isTrial ? "Teste Expirado" : "Plano Expirado"}
-          </h1>
-          <p className="text-muted-foreground">
-            {plan.isTrial
-              ? "Seu período de teste gratuito de 15 minutos terminou. Para continuar usando o sistema, entre em contato e assine um plano."
-              : "Seu plano expirou. Renove para continuar usando o sistema."}
-          </p>
-          <a
-            href={`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button className="gap-2 bg-green-600 hover:bg-green-700 text-white w-full">
-              <MessageCircle className="h-5 w-5" />
-              Falar no WhatsApp
-            </Button>
-          </a>
-          <p className="text-xs text-muted-foreground">
-            WhatsApp: (37) 9 9123-7543
-          </p>
-          <Button variant="outline" onClick={signOut} className="w-full">
-            Sair da conta
-          </Button>
-        </div>
-      </div>
     );
   }
 
