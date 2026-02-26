@@ -25,6 +25,7 @@ import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
 import { BulkRenewDialog } from "@/components/BulkRenewDialog";
 import { CSVImportExport } from "@/components/CSVImportExport";
 import { ImportClientsDialog } from "@/components/ImportClientsDialog";
+import { BulkSelectedWhatsAppDialog } from "@/components/BulkSelectedWhatsAppDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +72,7 @@ const Clients = () => {
   const [bulkEditField, setBulkEditField] = useState<string>("");
   const [bulkEditValue, setBulkEditValue] = useState("");
   const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkWhatsAppSelectedOpen, setBulkWhatsAppSelectedOpen] = useState(false);
 
   const allStatuses = getAllStatuses();
 
@@ -324,6 +326,10 @@ const Clients = () => {
             {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
           </span>
           <div className="flex gap-2 ml-auto">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkWhatsAppSelectedOpen(true)}>
+              <MessageSquare className="h-3.5 w-3.5" />
+              Enviar Mensagem
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
               setBulkEditField("");
               setBulkEditValue("");
@@ -469,6 +475,7 @@ const Clients = () => {
       <WhatsAppMessageDialog client={messageClient} open={!!messageClient} onOpenChange={(open) => !open && setMessageClient(null)} />
       <BulkWhatsAppDialog clients={clients || []} open={bulkOpen} onOpenChange={setBulkOpen} />
       <BulkRenewDialog clients={clients || []} open={bulkRenewOpen} onOpenChange={setBulkRenewOpen} />
+      <BulkSelectedWhatsAppDialog clients={clients || []} selectedIds={selectedIds} open={bulkWhatsAppSelectedOpen} onOpenChange={setBulkWhatsAppSelectedOpen} />
 
       {/* Single delete dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
