@@ -124,21 +124,21 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
         const today = startOfDay(new Date());
         const [year, month, day] = c.expiration_date.split("T")[0].split("-").map(Number);
         const expDate = startOfDay(new Date(year, month - 1, day));
-        const diff = differenceInDays(expDate, today);
+        const diff = differenceInDays(expDate, today); // positive = future, negative = past
 
         let multiplier = 1;
-        if (periodType === "horas") multiplier = 1 / 24;
         if (periodType === "semanas") multiplier = 7;
         if (periodType === "meses") multiplier = 30;
 
-        const targetDiff = periodValue * multiplier;
+        const maxDays = periodValue * multiplier;
 
         if (periodDirection === "before") {
-          // Client expires in X days
-          if (diff > targetDiff || diff < 0) return false;
+          // Client expires in 1 to X days (future)
+          if (diff < 0 || diff > maxDays) return false;
         } else {
-          // Client expired X days ago
-          if (diff > 0 || Math.abs(diff) > targetDiff) return false;
+          // Client expired 1 to X days ago (past)
+          const absDiff = Math.abs(diff);
+          if (diff > 0 || absDiff < 1 || absDiff > maxDays) return false;
         }
       }
 
@@ -397,6 +397,19 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
               </p>
             </div>
 
+            <div className="space-y-2">
+              <Label>Direção</Label>
+              <Select value={periodDirection} onValueChange={setPeriodDirection}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="before">Antes do vencimento (vai vencer)</SelectItem>
+                  <SelectItem value="after">Depois do vencimento (já venceu)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo período</Label>
@@ -406,7 +419,6 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dias">Dias</SelectItem>
-                    <SelectItem value="horas">Horas</SelectItem>
                     <SelectItem value="semanas">Semanas</SelectItem>
                     <SelectItem value="meses">Meses</SelectItem>
                   </SelectContent>
@@ -424,18 +436,27 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Direção</Label>
-              <Select value={periodDirection} onValueChange={setPeriodDirection}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="before">Antes do vencimento</SelectItem>
-                  <SelectItem value="after">Depois do vencimento</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Dynamic summary */}
+            {periodValue > 0 && (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                {periodDirection === "after" ? (
+                  <p>
+                    📩 Será enviado para clientes <strong>vencidos</strong> dentro de{" "}
+                    <strong>1 a {periodValue} {periodType === "dias" ? (periodValue === 1 ? "dia" : "dias") : periodType === "semanas" ? (periodValue === 1 ? "semana" : "semanas") : (periodValue === 1 ? "mês" : "meses")}</strong> atrás
+                  </p>
+                ) : (
+                  <p>
+                    📩 Será enviado para clientes que <strong>vão vencer</strong> dentro de{" "}
+                    <strong>1 a {periodValue} {periodType === "dias" ? (periodValue === 1 ? "dia" : "dias") : periodType === "semanas" ? (periodValue === 1 ? "semana" : "semanas") : (periodValue === 1 ? "mês" : "meses")}</strong>
+                  </p>
+                )}
+                {statusFilter.length > 0 && (
+                  <p className="text-muted-foreground mt-1">
+                    Filtrado também por status: {statusFilter.map(s => allStatuses.find(st => st.key === s)?.label).filter(Boolean).join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* ---- PREVIEW ---- */}

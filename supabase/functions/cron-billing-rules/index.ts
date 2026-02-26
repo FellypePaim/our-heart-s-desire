@@ -145,23 +145,25 @@ Deno.serve(async (req) => {
 
         // Period filter
         if (rule.period_value > 0) {
-          const [eY, eM, eD] = c.expiration_date.split("-").map(Number);
-          const expDate = new Date(eY, eM - 1, eD);
+          const [eY2, eM2, eD2] = c.expiration_date.split("-").map(Number);
+          const expDate2 = new Date(eY2, eM2 - 1, eD2);
           const diff = Math.round(
-            (expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+            (expDate2.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
           );
 
           let multiplier = 1;
-          if (rule.period_type === "horas") multiplier = 1 / 24;
           if (rule.period_type === "semanas") multiplier = 7;
           if (rule.period_type === "meses") multiplier = 30;
 
-          const targetDiff = rule.period_value * multiplier;
+          const maxDays = rule.period_value * multiplier;
 
           if (rule.period_direction === "before") {
-            if (diff > targetDiff || diff < 0) return false;
+            // Client expires in 1 to X days (future)
+            if (diff < 0 || diff > maxDays) return false;
           } else {
-            if (diff > 0 || Math.abs(diff) > targetDiff) return false;
+            // Client expired 1 to X days ago (past)
+            const absDiff = Math.abs(diff);
+            if (diff > 0 || absDiff < 1 || absDiff > maxDays) return false;
           }
         }
 
