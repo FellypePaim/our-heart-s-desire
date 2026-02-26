@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, AlertTriangle } from "lucide-react";
+import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyReseller } from "@/hooks/useResellers";
@@ -13,8 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServiceOptions } from "@/hooks/useServiceOptions";
 import { validateWhatsAppPhone } from "@/lib/phone";
-import { useLimitCheck } from "@/hooks/useLimitCheck";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function AddClientDialog() {
   const [open, setOpen] = useState(false);
@@ -45,7 +43,7 @@ export function AddClientDialog() {
   const { data: pagamentos } = useServiceOptions("pagamento");
 
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
-  const { canCreateClient, clientLimitMsg } = useLimitCheck();
+  
 
   const resetForm = () => {
     setName(""); setPhone(""); setPhoneError(""); setPlan(""); setExpirationDate("");
@@ -123,20 +121,10 @@ export function AddClientDialog() {
 
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button className="gap-2" disabled={!canCreateClient} onClick={() => canCreateClient && setOpen(true)}>
-              {!canCreateClient && <AlertTriangle className="h-4 w-4" />}
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
-          </span>
-        </TooltipTrigger>
-        {!canCreateClient && (
-          <TooltipContent><p>{clientLimitMsg}</p></TooltipContent>
-        )}
-      </Tooltip>
+      <Button className="gap-2" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        Novo Cliente
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
