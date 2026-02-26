@@ -93,6 +93,8 @@ export type Database = {
       }
       billing_rules: {
         Row: {
+          batch_pause: number
+          batch_size: number
           billing_type: string
           created_at: string
           delay_max: number
@@ -114,6 +116,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          batch_pause?: number
+          batch_size?: number
           billing_type?: string
           created_at?: string
           delay_max?: number
@@ -135,6 +139,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          batch_pause?: number
+          batch_size?: number
           billing_type?: string
           created_at?: string
           delay_max?: number
