@@ -184,9 +184,11 @@ Deno.serve(async (req) => {
           .replace(/\{plano\}/g, client.plan || "")
           .replace(/\{vencimento\}/g, formattedDate);
 
-        // Random delay between min and max
+        // Random delay between min and max (minimum 3s to avoid WhatsApp spam ban)
+        const safeMin = Math.max(3, rule.delay_min);
+        const safeMax = Math.max(safeMin, rule.delay_max);
         const delay = Math.floor(
-          Math.random() * (rule.delay_max - rule.delay_min + 1) + rule.delay_min
+          Math.random() * (safeMax - safeMin + 1) + safeMin
         ) * 1000;
 
         if (sent > 0) {

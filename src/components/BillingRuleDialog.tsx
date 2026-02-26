@@ -69,8 +69,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
   const [periodType, setPeriodType] = useState("dias");
   const [periodValue, setPeriodValue] = useState(0);
   const [periodDirection, setPeriodDirection] = useState("before");
-  const [delayMin, setDelayMin] = useState(1);
-  const [delayMax, setDelayMax] = useState(3);
+  const [delayMin, setDelayMin] = useState(3);
+  const [delayMax, setDelayMax] = useState(7);
   const [sendHour, setSendHour] = useState(9);
   const [sendMinute, setSendMinute] = useState(0);
 
@@ -84,8 +84,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
       setPeriodType(rule.period_type);
       setPeriodValue(rule.period_value);
       setPeriodDirection(rule.period_direction);
-      setDelayMin(rule.delay_min);
-      setDelayMax(rule.delay_max);
+      setDelayMin(Math.max(3, rule.delay_min));
+      setDelayMax(Math.max(rule.delay_max, Math.max(3, rule.delay_min)));
       setSendHour(rule.send_hour);
       setSendMinute(rule.send_minute);
       setSelectedMessage("");
@@ -98,8 +98,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
       setPeriodType("dias");
       setPeriodValue(0);
       setPeriodDirection("before");
-      setDelayMin(1);
-      setDelayMax(3);
+      setDelayMin(3);
+      setDelayMax(7);
       setSendHour(9);
       setSendMinute(0);
     }
@@ -298,23 +298,30 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
             {/* Delay */}
             <div className="space-y-2">
               <Label className="text-sm">Intervalo aleatório entre cada envio (segundos)</Label>
+              <p className="text-xs text-muted-foreground">
+                Mínimo de 3 segundos para evitar bloqueio por spam no WhatsApp.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Intervalo Mínimo</Label>
                   <Input
                     type="number"
-                    min={1}
+                    min={3}
                     value={delayMin}
-                    onChange={(e) => setDelayMin(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Math.max(3, Number(e.target.value));
+                      setDelayMin(val);
+                      if (delayMax < val) setDelayMax(val);
+                    }}
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Intervalo Máximo</Label>
                   <Input
                     type="number"
-                    min={1}
+                    min={delayMin}
                     value={delayMax}
-                    onChange={(e) => setDelayMax(Number(e.target.value))}
+                    onChange={(e) => setDelayMax(Math.max(delayMin, Number(e.target.value)))}
                   />
                 </div>
               </div>
