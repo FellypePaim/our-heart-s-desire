@@ -65,8 +65,15 @@ function TemplateEditor({
   const previewText = (text: string) =>
     text
       .replace(/\{nome\}/g, "João Silva")
-      .replace(/\{plano\}/g, "Premium")
-      .replace(/\{vencimento\}/g, "17/02/2026");
+      .replace(/\{plano\}/g, "Mensal")
+      .replace(/\{vencimento\}/g, "17/02/2026")
+      .replace(/\{valor\}/g, "30,00")
+      .replace(/\{servidor\}/g, "BRAVE")
+      .replace(/\{usuario\}/g, "3126949777")
+      .replace(/\{senha\}/g, "5980102915")
+      .replace(/\{app\}/g, "IPTV Smarters")
+      .replace(/\{telas\}/g, "1")
+      .replace(/\{pix\}/g, "seupix@email.com");
 
   const borderClass = statusConfig?.borderClass ?? "border-border";
 
