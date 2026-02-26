@@ -326,20 +326,23 @@ Deno.serve(async (req) => {
       // Now request pairing code
       let code: string | null = null;
       
+      // Try GET /instance/pairingcode with query params
       try {
-        const pairRes = await fetch(`${baseUrl}/instance/pairingcode`, {
-          method: "POST",
+        const pairRes = await fetch(`${baseUrl}/instance/pairingcode?phone=${pairingPhone}`, {
+          method: "GET",
           headers: {
-            "Content-Type": "application/json",
             token: instance.api_token,
           },
-          body: JSON.stringify({ phone: pairingPhone }),
         });
         const pairData = await pairRes.json();
-        console.log("UAZAPI pairingcode response:", JSON.stringify(pairData));
-        code = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
+        console.log("UAZAPI pairingcode GET response:", JSON.stringify(pairData));
+        // Only accept string codes with 4+ chars (avoid picking up HTTP status codes)
+        const rawCode = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
+        if (typeof rawCode === "string" && rawCode.length >= 4) {
+          code = rawCode;
+        }
       } catch (e) {
-        console.error("pairingcode endpoint failed:", e);
+        console.error("pairingcode GET endpoint failed:", e);
       }
 
       // Fallback: try connect with pairingCode flag
@@ -354,8 +357,11 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ pairingCode: true, phone: pairingPhone }),
           });
           const pairData2 = await pairRes2.json();
-          console.log("UAZAPI connect+pairing response:", JSON.stringify(pairData2));
-          code = pairData2?.code || pairData2?.pairingCode || pairData2?.instance?.paircode || null;
+          console.log("UAZAPI connect+pairing response keys:", JSON.stringify(Object.keys(pairData2)));
+          const rawCode2 = pairData2?.code || pairData2?.pairingCode || pairData2?.paircode || pairData2?.instance?.paircode || null;
+          if (typeof rawCode2 === "string" && rawCode2.length >= 4) {
+            code = rawCode2;
+          }
         } catch (e) {
           console.error("pairing via connect also failed:", e);
         }
