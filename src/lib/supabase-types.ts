@@ -18,6 +18,9 @@ export interface Client {
   dispositivo: string | null;
   captacao: string | null;
   forma_pagamento: string | null;
+  login: string | null;
+  senha: string | null;
+  pix: string | null;
 }
 
 export interface UserRole {

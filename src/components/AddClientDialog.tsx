@@ -30,6 +30,9 @@ export function AddClientDialog() {
   const [dispositivo, setDispositivo] = useState("");
   const [captacao, setCaptacao] = useState("");
   const [formaPagamento, setFormaPagamento] = useState("");
+  const [login, setLogin] = useState("");
+  const [senhaCli, setSenhaCli] = useState("");
+  const [pixCli, setPixCli] = useState("");
   const { user, roles } = useAuth();
   const { data: myReseller } = useMyReseller();
   const { toast } = useToast();
@@ -49,6 +52,7 @@ export function AddClientDialog() {
     setName(""); setPhone(""); setPhoneError(""); setPlan(""); setExpirationDate("");
     setNotes(""); setValor(""); setServidor(""); setTelas("1"); setAplicativo("");
     setDispositivo(""); setCaptacao(""); setFormaPagamento("");
+    setLogin(""); setSenhaCli(""); setPixCli("");
   };
 
   const handlePhoneChange = (value: string) => {
@@ -100,6 +104,9 @@ export function AddClientDialog() {
         dispositivo: dispositivo || "",
         captacao: captacao || "",
         forma_pagamento: formaPagamento || "",
+        login: login || "",
+        senha: senhaCli || "",
+        pix: pixCli || "",
       };
 
       if (isReseller && myReseller) insertData.reseller_id = myReseller.id;
@@ -206,6 +213,18 @@ export function AddClientDialog() {
                     {captacoes?.map(c => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login">Login / Usuário</Label>
+                <Input id="login" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Login de acesso" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="senhaCli">Senha</Label>
+                <Input id="senhaCli" value={senhaCli} onChange={(e) => setSenhaCli(e.target.value)} placeholder="Senha de acesso" />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label htmlFor="pixCli">Chave PIX (individual)</Label>
+                <Input id="pixCli" value={pixCli} onChange={(e) => setPixCli(e.target.value)} placeholder="PIX do cliente (opcional)" />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="notes">Observações</Label>

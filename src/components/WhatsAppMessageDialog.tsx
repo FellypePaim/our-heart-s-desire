@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -38,6 +39,15 @@ export function WhatsAppMessageDialog({ client, open, onOpenChange }: WhatsAppMe
   const [sendMethod, setSendMethod] = useState<"manual" | "api">("manual");
   const [sending, setSending] = useState(false);
 
+  const { data: profile } = useQuery({
+    queryKey: ["profile_pix", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("pix_key").eq("user_id", user!.id).maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const allStatuses = getAllStatuses();
 
   const templateOptions = useMemo(() => {
@@ -61,11 +71,11 @@ export function WhatsAppMessageDialog({ client, open, onOpenChange }: WhatsAppMe
       .replace(/\{vencimento\}/g, expirationFormatted)
       .replace(/\{valor\}/g, client.valor ? String(client.valor).replace(".", ",") : "0,00")
       .replace(/\{servidor\}/g, client.servidor || "—")
-      .replace(/\{usuario\}/g, client.phone || "—")
-      .replace(/\{senha\}/g, "—")
+      .replace(/\{usuario\}/g, (client as any).login || client.phone || "—")
+      .replace(/\{senha\}/g, (client as any).senha || "—")
       .replace(/\{app\}/g, client.aplicativo || "—")
       .replace(/\{telas\}/g, String(client.telas || 1))
-      .replace(/\{pix\}/g, "—");
+      .replace(/\{pix\}/g, (client as any).pix || (profile as any)?.pix_key || "—");
   };
 
   const previewMessage = useMemo(() => {

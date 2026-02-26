@@ -181,17 +181,28 @@ Deno.serve(async (req) => {
         const [eY, eM, eD] = client.expiration_date.split("-").map(Number);
         const formattedDate = `${String(eD).padStart(2, "0")}/${String(eM).padStart(2, "0")}/${eY}`;
 
+        // Fetch user's global PIX key
+        let globalPix = "";
+        if (!globalPix) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("pix_key")
+            .eq("user_id", rule.user_id)
+            .maybeSingle();
+          globalPix = profileData?.pix_key || "";
+        }
+
         let text = rule.message_template
           .replace(/\{nome\}/g, client.name)
           .replace(/\{plano\}/g, client.plan || "")
           .replace(/\{vencimento\}/g, formattedDate)
           .replace(/\{valor\}/g, client.valor ? String(client.valor).replace(".", ",") : "0,00")
           .replace(/\{servidor\}/g, client.servidor || "—")
-          .replace(/\{usuario\}/g, client.phone || "—")
-          .replace(/\{senha\}/g, "—")
+          .replace(/\{usuario\}/g, client.login || client.phone || "—")
+          .replace(/\{senha\}/g, client.senha || "—")
           .replace(/\{app\}/g, client.aplicativo || "—")
           .replace(/\{telas\}/g, String(client.telas || 1))
-          .replace(/\{pix\}/g, "—");
+          .replace(/\{pix\}/g, client.pix || globalPix || "—");
 
         // Random delay between min and max (minimum 3s to avoid WhatsApp spam ban)
         const safeMin = Math.max(3, rule.delay_min);
