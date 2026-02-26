@@ -13,8 +13,10 @@ const UAZAPI_ADMIN_TOKEN = () => {
 };
 
 const UAZAPI_BASE = () => {
-  const sub = Deno.env.get("UAZAPI_SUBDOMAIN");
+  let sub = Deno.env.get("UAZAPI_SUBDOMAIN");
   if (!sub) throw new Error("UAZAPI_SUBDOMAIN não configurado");
+  // Handle cases where the full URL or domain was stored instead of just the subdomain
+  sub = sub.replace(/^https?:\/\//, "").replace(/\.uazapi\.com.*$/, "").replace(/\//g, "");
   return `https://${sub}.uazapi.com`;
 };
 
