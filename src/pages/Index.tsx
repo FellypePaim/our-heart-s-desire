@@ -14,7 +14,7 @@ import { ChurnRetentionChart } from "@/components/radar/ChurnRetentionChart";
 
 import { RevenueForecast } from "@/components/radar/RevenueForecast";
 import { RiskScore } from "@/components/radar/RiskScore";
-import { OperationalLimits } from "@/components/OperationalLimits";
+
 import { DailyTipsPopover } from "@/components/DailyTipsPopover";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -127,9 +127,6 @@ const Index = () => {
 
         <TabsContent value="clients" className="flex-1 overflow-auto mt-0">
           <ClientMetrics clients={clients || []} isLoading={isLoading} mask={hidden ? mask : undefined} />
-          <div className="px-4 md:px-6 pt-2">
-            <OperationalLimits />
-          </div>
 
           {/* Kanban Board */}
           <div className="overflow-x-auto p-4 md:p-6">
