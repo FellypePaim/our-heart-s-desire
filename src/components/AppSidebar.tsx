@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut,
-  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search, CreditCard
+  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search, CreditCard, Zap
 } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export function AppSidebar() {
     { to: "/", label: "Dashboard", icon: LayoutDashboard },
     { to: "/clients", label: "Meus Clientes", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
+    { to: "/billing", label: "Cobranças", icon: Zap },
     { to: "/reports", label: "Relatórios", icon: FileText },
     { to: "/service-config", label: "Servidores & Planos", icon: Server },
     { to: "/settings", label: "Configurações", icon: Settings },
@@ -33,6 +34,7 @@ export function AppSidebar() {
     { to: "/clients", label: "Clientes", icon: Users },
     { to: "/resellers", label: "Revendedores", icon: Users },
     { to: "/messages", label: "Mensagens", icon: MessageSquare },
+    { to: "/billing", label: "Cobranças", icon: Zap },
     { to: "/reports", label: "Relatórios", icon: FileText },
     { to: "/service-config", label: "Servidores & Planos", icon: Server },
     { to: "/settings", label: "Configurações", icon: Settings },

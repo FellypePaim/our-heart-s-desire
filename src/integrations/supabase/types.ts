@@ -47,6 +47,72 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_rules: {
+        Row: {
+          billing_type: string
+          created_at: string
+          delay_max: number
+          delay_min: number
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          last_run_count: number | null
+          message_template: string
+          name: string
+          period_direction: string
+          period_type: string
+          period_value: number
+          send_hour: number
+          send_minute: number
+          status_filter: string[] | null
+          total_sent: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_type?: string
+          created_at?: string
+          delay_max?: number
+          delay_min?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          last_run_count?: number | null
+          message_template?: string
+          name: string
+          period_direction?: string
+          period_type?: string
+          period_value?: number
+          send_hour?: number
+          send_minute?: number
+          status_filter?: string[] | null
+          total_sent?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_type?: string
+          created_at?: string
+          delay_max?: number
+          delay_min?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          last_run_count?: number | null
+          message_template?: string
+          name?: string
+          period_direction?: string
+          period_type?: string
+          period_value?: number
+          send_hour?: number
+          send_minute?: number
+          status_filter?: string[] | null
+          total_sent?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           aplicativo: string | null
