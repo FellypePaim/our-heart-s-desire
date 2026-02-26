@@ -78,7 +78,11 @@ const SettingsPage = () => {
         return;
       }
 
-      const state = data?.data?.state || data?.data?.status || "unknown";
+      // state/status can be objects or strings - normalize to string
+      const rawState = data?.data?.instance?.status || data?.data?.state || data?.data?.status || "unknown";
+      const state = typeof rawState === "string" ? rawState : 
+        (rawState?.connected === true ? "connected" : 
+         rawState?.loggedIn === true ? "connected" : "disconnected");
       setConnectionStatus(state);
 
       // Check multiple possible QR code field names
