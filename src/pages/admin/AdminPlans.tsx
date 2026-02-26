@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, Search, RefreshCw, Calendar, Filter, Crown, Users, ShieldCheck } from "lucide-react";
+import { CreditCard, Search, RefreshCw, Calendar, Filter, Crown, Users, ShieldCheck, Coins } from "lucide-react";
 
 interface UserPlan {
   userId: string;
@@ -23,6 +23,7 @@ interface UserPlan {
   planType: string;
   planExpiresAt: string;
   isExpired: boolean;
+  creditBalance: number;
 }
 
 const roleLabels: Record<string, string> = {
@@ -53,6 +54,12 @@ const AdminPlans = () => {
   const [renewPlanType, setRenewPlanType] = useState("monthly");
   const [renewSaving, setRenewSaving] = useState(false);
 
+  // Credit grant state
+  const [creditOpen, setCreditOpen] = useState(false);
+  const [creditUser, setCreditUser] = useState<UserPlan | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [creditSaving, setCreditSaving] = useState(false);
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -70,9 +77,14 @@ const AdminPlans = () => {
         .eq("is_active", true);
       if (rError) throw rError;
 
+      const { data: creditsData } = await supabase
+        .from("credits")
+        .select("user_id, balance");
+
       const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
       const planMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
       const roleMap = new Map((rolesData || []).map((r: any) => [r.user_id, r.role]));
+      const creditMap = new Map((creditsData || []).map((c: any) => [c.user_id, c.balance]));
 
       const allUserIds = new Set([
         ...(profilesData || []).map((p: any) => p.id),
@@ -85,10 +97,9 @@ const AdminPlans = () => {
         const plan = planMap.get(uid) as any;
         const role = roleMap.get(uid) as string || "user";
 
-        if (role === "super_admin") continue; // Don't show super admins
+        if (role === "super_admin") continue;
 
         const expiresAt = plan?.plan_expires_at;
-        // Skip users without a profile/plan — they have no plan data to show
         if (!expiresAt) continue;
 
         result.push({
@@ -99,6 +110,7 @@ const AdminPlans = () => {
           planType: plan?.plan_type || "trial",
           planExpiresAt: expiresAt,
           isExpired: isPast(new Date(expiresAt)),
+          creditBalance: creditMap.get(uid) ?? 0,
         });
       }
 
@@ -141,7 +153,6 @@ const AdminPlans = () => {
     try {
       let newExpiry: string;
       if (typeof daysOrDate === "number") {
-        // If plan is still active, extend from current expiration; otherwise from now
         const currentExpiry = new Date(renewUser.planExpiresAt);
         const base = currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
         newExpiry = addDays(base, daysOrDate).toISOString();
@@ -171,6 +182,67 @@ const AdminPlans = () => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setRenewSaving(false);
+    }
+  };
+
+  const openGrantCredits = (u: UserPlan) => {
+    setCreditUser(u);
+    setCreditAmount("");
+    setCreditOpen(true);
+  };
+
+  const handleGrantCredits = async () => {
+    if (!creditUser || !user) return;
+    const amount = parseInt(creditAmount);
+    if (!amount || amount < 1) return;
+    setCreditSaving(true);
+    try {
+      // Upsert credits balance
+      const { data: existing } = await supabase
+        .from("credits")
+        .select("id, balance")
+        .eq("user_id", creditUser.userId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("credits")
+          .update({ balance: existing.balance + amount })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("credits")
+          .insert({ user_id: creditUser.userId, balance: amount });
+        if (error) throw error;
+      }
+
+      // Log transaction
+      const { error: txError } = await supabase
+        .from("credit_transactions")
+        .insert({
+          user_id: creditUser.userId,
+          amount,
+          type: "grant",
+          granted_by: user.id,
+        });
+      if (txError) throw txError;
+
+      await logAudit(user.id, "credits_granted", "credits", creditUser.userId, {
+        amount,
+        target_email: creditUser.email,
+      });
+
+      toast({
+        title: "Créditos concedidos!",
+        description: `${amount} crédito(s) adicionado(s) para ${creditUser.displayName}.`,
+      });
+      setCreditOpen(false);
+      fetchUsers();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setCreditSaving(false);
     }
   };
 
@@ -252,6 +324,7 @@ const AdminPlans = () => {
             <TableRow>
               <TableHead>Usuário</TableHead>
               <TableHead>Cargo</TableHead>
+              <TableHead>Créditos</TableHead>
               <TableHead>Plano</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
@@ -261,11 +334,11 @@ const AdminPlans = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</TableCell>
               </TableRow>
             ) : (
               filtered.map((u) => (
@@ -281,6 +354,16 @@ const AdminPlans = () => {
                       {roleIcons[u.role]}
                       {roleLabels[u.role] || u.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {u.role === "panel_admin" ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <Coins className="h-3 w-3" />
+                        {u.creditBalance}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={u.planType === "trial" ? "secondary" : "default"}>
@@ -303,10 +386,18 @@ const AdminPlans = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openRenew(u)}>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Renovar
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openRenew(u)}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Renovar
+                      </Button>
+                      {u.role === "panel_admin" && (
+                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openGrantCredits(u)}>
+                          <Coins className="h-3.5 w-3.5" />
+                          Créditos
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -333,7 +424,7 @@ const AdminPlans = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">Mensal (30 dias)</SelectItem>
-                  <SelectItem value="trial">Teste (15 min)</SelectItem>
+                  <SelectItem value="trial">Teste (7 dias)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -362,6 +453,51 @@ const AdminPlans = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Grant Credits Dialog */}
+      <Dialog open={creditOpen} onOpenChange={setCreditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5" />
+              Conceder Créditos
+            </DialogTitle>
+            <DialogDescription>
+              Adicionar créditos para <strong>{creditUser?.displayName}</strong> ({creditUser?.email}).
+              Saldo atual: <strong>{creditUser?.creditBalance ?? 0}</strong> créditos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Quantidade de créditos</Label>
+              <Input
+                type="number"
+                min="1"
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(e.target.value)}
+                placeholder="Ex: 10"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cada crédito = 1 renovação de 30 dias para um revendedor
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[5, 10, 30].map((n) => (
+                <Button key={n} variant="outline" onClick={() => setCreditAmount(String(n))}>
+                  +{n}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleGrantCredits} disabled={creditSaving || !creditAmount || parseInt(creditAmount) < 1}>
+              {creditSaving ? "Salvando..." : "Conceder"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

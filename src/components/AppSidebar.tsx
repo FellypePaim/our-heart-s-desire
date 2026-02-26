@@ -1,10 +1,11 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { useCredits } from "@/hooks/useCredits";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, MessageSquare, Settings, LogOut,
-  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search, CreditCard, Zap
+  Crown, Shield, Globe, Moon, Sun, Menu, X, Server, FileText, Search, CreditCard, Zap, Coins
 } from "lucide-react";
 import logoBrave from "@/assets/logo-brave.png";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function AppSidebar() {
 
   const isPanelAdmin = roles.some((r) => r.role === "panel_admin" && r.is_active);
   const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
+  const { balance: creditBalance } = useCredits();
 
   const resellerItems = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -95,6 +97,12 @@ export function AppSidebar() {
           <p className="text-xs text-sidebar-foreground/60 truncate">
             {getRoleLabel()}
           </p>
+          {isPanelAdmin && (
+            <div className="flex items-center gap-1 text-xs text-amber-500">
+              <Coins className="h-3 w-3" />
+              <span>{creditBalance} créditos</span>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setMobileOpen(false)}

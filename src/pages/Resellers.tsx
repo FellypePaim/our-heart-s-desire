@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useResellers, Reseller } from "@/hooks/useResellers";
 import { useClients } from "@/hooks/useClients";
+import { useCredits } from "@/hooks/useCredits";
 import { Navigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle, Download, FileText, FileSpreadsheet, RefreshCw, Calendar } from "lucide-react";
+import { Users, Plus, Pause, Play, Search, ChevronLeft, ChevronRight, Pencil, Trash2, Filter, AlertTriangle, Download, FileText, FileSpreadsheet, RefreshCw, Calendar, Coins } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UserProfile {
@@ -45,6 +46,7 @@ const Resellers = () => {
   const isSuperAdmin = roles.some((r) => r.role === "super_admin" && r.is_active);
   const { data: resellers, isLoading } = useResellers();
   const { data: clients } = useClients();
+  const { balance: creditBalance, invalidate: invalidateCredits } = useCredits();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [page, setPage] = useState(1);
@@ -297,6 +299,13 @@ const Resellers = () => {
           </p>
         </div>
 
+        {isPanelAdmin && (
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2">
+            <Coins className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">{creditBalance} créditos</span>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -532,7 +541,7 @@ const Resellers = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Renew Reseller Dialog */}
+      {/* Renew Reseller Dialog — credit-based for Masters, manual for SA */}
       <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -542,75 +551,120 @@ const Resellers = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              disabled={renewSaving}
-              onClick={async () => {
-                if (!renewingReseller || !user) return;
-                setRenewSaving(true);
-                try {
-                  // If plan is still active, extend from current expiration; otherwise from now
-                  const currentPlan = planMap.get(renewingReseller.owner_user_id);
-                  const currentExpiry = currentPlan?.plan_expires_at ? new Date(currentPlan.plan_expires_at) : null;
-                  const base = currentExpiry && currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
-                  const newExpiry = new Date(base);
-                  newExpiry.setDate(newExpiry.getDate() + 30);
-                  const { error } = await supabase
-                    .from("profiles")
-                    .update({ plan_type: "monthly", plan_expires_at: newExpiry.toISOString() })
-                    .eq("user_id", renewingReseller.owner_user_id);
-                  if (error) throw error;
-                  await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { days: 30 });
-                  toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado por +30 dias.` });
-                  // Refresh plan data
-                  const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
-                  if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
-                  setRenewOpen(false);
-                } catch (e: any) {
-                  toast({ title: "Erro", description: e.message, variant: "destructive" });
-                } finally {
-                  setRenewSaving(false);
-                }
-              }}
-            >
-              <Calendar className="h-4 w-4" />
-              Renovar +30 dias
-            </Button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="flex-1 h-px bg-border" />
-              ou selecione a data
-              <div className="flex-1 h-px bg-border" />
-            </div>
-            <div className="flex gap-2">
-              <Input type="date" value={renewDate} onChange={(e) => setRenewDate(e.target.value)} className="flex-1" />
-              <Button
-                disabled={!renewDate || renewSaving}
-                onClick={async () => {
-                  if (!renewingReseller || !user || !renewDate) return;
-                  setRenewSaving(true);
-                  try {
-                    const expiry = new Date(renewDate + "T23:59:59");
-                    const { error } = await supabase
-                      .from("profiles")
-                      .update({ plan_type: "monthly", plan_expires_at: expiry.toISOString() })
-                      .eq("user_id", renewingReseller.owner_user_id);
-                    if (error) throw error;
-                    await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { date: renewDate });
-                    toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado até ${renewDate}.` });
-                    const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
-                    if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
-                    setRenewOpen(false);
-                  } catch (e: any) {
-                    toast({ title: "Erro", description: e.message, variant: "destructive" });
-                  } finally {
-                    setRenewSaving(false);
-                  }
-                }}
-              >
-                {renewSaving ? "Salvando..." : "Renovar"}
-              </Button>
-            </div>
+            {isPanelAdmin && !isSuperAdmin ? (
+              <>
+                <div className="rounded-lg border bg-muted/50 p-3 flex items-center gap-3">
+                  <Coins className="h-5 w-5 text-amber-500" />
+                  <div>
+                    <p className="text-sm font-medium">Saldo: {creditBalance} créditos</p>
+                    <p className="text-xs text-muted-foreground">1 crédito = +30 dias</p>
+                  </div>
+                </div>
+                <Button
+                  className="w-full gap-2"
+                  disabled={renewSaving || creditBalance < 1}
+                  onClick={async () => {
+                    if (!renewingReseller || !user) return;
+                    setRenewSaving(true);
+                    try {
+                      const { error } = await supabase.rpc("spend_credit_renew_reseller", {
+                        _master_user_id: user.id,
+                        _reseller_user_id: renewingReseller.owner_user_id,
+                      });
+                      if (error) throw error;
+                      await logAudit(user.id, "reseller_plan_renewed_credit", "reseller", renewingReseller.id, { credit_spent: 1 });
+                      toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado por +30 dias (1 crédito usado).` });
+                      invalidateCredits();
+                      const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
+                      if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
+                      setRenewOpen(false);
+                    } catch (e: any) {
+                      toast({ title: "Erro", description: e.message, variant: "destructive" });
+                    } finally {
+                      setRenewSaving(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {creditBalance < 1 ? "Sem créditos disponíveis" : "Gastar 1 crédito (+30 dias)"}
+                </Button>
+                {creditBalance < 1 && (
+                  <p className="text-xs text-destructive text-center">
+                    Solicite mais créditos ao administrador para renovar revendedores.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={renewSaving}
+                  onClick={async () => {
+                    if (!renewingReseller || !user) return;
+                    setRenewSaving(true);
+                    try {
+                      const currentPlan = planMap.get(renewingReseller.owner_user_id);
+                      const currentExpiry = currentPlan?.plan_expires_at ? new Date(currentPlan.plan_expires_at) : null;
+                      const base = currentExpiry && currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
+                      const newExpiry = new Date(base);
+                      newExpiry.setDate(newExpiry.getDate() + 30);
+                      const { error } = await supabase
+                        .from("profiles")
+                        .update({ plan_type: "monthly", plan_expires_at: newExpiry.toISOString() })
+                        .eq("user_id", renewingReseller.owner_user_id);
+                      if (error) throw error;
+                      await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { days: 30 });
+                      toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado por +30 dias.` });
+                      const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
+                      if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
+                      setRenewOpen(false);
+                    } catch (e: any) {
+                      toast({ title: "Erro", description: e.message, variant: "destructive" });
+                    } finally {
+                      setRenewSaving(false);
+                    }
+                  }}
+                >
+                  <Calendar className="h-4 w-4" />
+                  Renovar +30 dias
+                </Button>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex-1 h-px bg-border" />
+                  ou selecione a data
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="flex gap-2">
+                  <Input type="date" value={renewDate} onChange={(e) => setRenewDate(e.target.value)} className="flex-1" />
+                  <Button
+                    disabled={!renewDate || renewSaving}
+                    onClick={async () => {
+                      if (!renewingReseller || !user || !renewDate) return;
+                      setRenewSaving(true);
+                      try {
+                        const expiry = new Date(renewDate + "T23:59:59");
+                        const { error } = await supabase
+                          .from("profiles")
+                          .update({ plan_type: "monthly", plan_expires_at: expiry.toISOString() })
+                          .eq("user_id", renewingReseller.owner_user_id);
+                        if (error) throw error;
+                        await logAudit(user.id, "reseller_plan_renewed", "reseller", renewingReseller.id, { date: renewDate });
+                        toast({ title: "Renovado!", description: `Plano de ${renewingReseller.display_name} renovado até ${renewDate}.` });
+                        const { data: freshPlans } = await supabase.from("profiles").select("user_id, plan_type, plan_expires_at");
+                        if (freshPlans) setPlanMap(new Map(freshPlans.map((p: any) => [p.user_id, p])));
+                        setRenewOpen(false);
+                      } catch (e: any) {
+                        toast({ title: "Erro", description: e.message, variant: "destructive" });
+                      } finally {
+                        setRenewSaving(false);
+                      }
+                    }}
+                  >
+                    {renewSaving ? "Salvando..." : "Renovar"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
