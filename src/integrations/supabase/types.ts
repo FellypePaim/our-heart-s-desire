@@ -216,7 +216,6 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
-          limits: Json
           plan_expires_at: string
           plan_type: string
           updated_at: string
@@ -227,7 +226,6 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
-          limits?: Json
           plan_expires_at?: string
           plan_type?: string
           updated_at?: string
@@ -238,7 +236,6 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
-          limits?: Json
           plan_expires_at?: string
           plan_type?: string
           updated_at?: string
@@ -252,7 +249,6 @@ export type Database = {
           created_by: string | null
           display_name: string
           id: string
-          limits: Json
           owner_user_id: string
           status: string
           updated_at: string
@@ -262,7 +258,6 @@ export type Database = {
           created_by?: string | null
           display_name: string
           id?: string
-          limits?: Json
           owner_user_id: string
           status?: string
           updated_at?: string
@@ -272,7 +267,6 @@ export type Database = {
           created_by?: string | null
           display_name?: string
           id?: string
-          limits?: Json
           owner_user_id?: string
           status?: string
           updated_at?: string

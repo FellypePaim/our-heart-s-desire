@@ -57,14 +57,12 @@ const Resellers = () => {
   const [newPassword, setNewPassword] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newPhoneError, setNewPhoneError] = useState("");
-  const [newMaxClients, setNewMaxClients] = useState(50);
+  
   const [saving, setSaving] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingReseller, setEditingReseller] = useState<Reseller | null>(null);
   const [editName, setEditName] = useState("");
-  const [editMaxClients, setEditMaxClients] = useState(50);
-  const [editMaxMessages, setEditMaxMessages] = useState(500);
   const [editSaving, setEditSaving] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -145,11 +143,6 @@ const Resellers = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (newMaxClients !== 50 && data?.user_id) {
-        await supabase.from("resellers")
-          .update({ limits: { max_clients: newMaxClients, max_messages_month: 500 } })
-          .eq("owner_user_id", data.user_id);
-      }
 
       await logAudit(user.id, "reseller_created", "reseller", undefined, {
         display_name: newDisplayName, email: newEmail
@@ -164,7 +157,7 @@ const Resellers = () => {
       setNewDisplayName("");
       setNewEmail("");
       setNewPassword("");
-      setNewMaxClients(50);
+      
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -192,8 +185,6 @@ const Resellers = () => {
   const openEdit = (reseller: Reseller) => {
     setEditingReseller(reseller);
     setEditName(reseller.display_name);
-    setEditMaxClients(reseller.limits?.max_clients || 50);
-    setEditMaxMessages(reseller.limits?.max_messages_month || 500);
     setEditOpen(true);
   };
 
@@ -205,7 +196,6 @@ const Resellers = () => {
         .from("resellers")
         .update({
           display_name: editName.trim(),
-          limits: { ...editingReseller.limits, max_clients: editMaxClients, max_messages_month: editMaxMessages },
         })
         .eq("id", editingReseller.id);
       if (error) throw error;
@@ -255,8 +245,6 @@ const Resellers = () => {
     doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 30);
 
     const tableData = resellers.map((r) => {
-      const limit = r.limits?.max_clients || 50;
-      const usage = Math.round(((r.client_count || 0) / limit) * 100);
       const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
       const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
       const fmtRev = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rRevenue);
@@ -265,14 +253,12 @@ const Resellers = () => {
         r.status === "active" ? "Ativo" : "Suspenso",
         r.client_count || 0,
         fmtRev,
-        limit,
-        `${usage}%`
       ];
     });
 
     autoTable(doc, {
       startY: 40,
-      head: [["Revendedor", "Status", "Clientes", "Receita", "Limite", "Uso"]],
+      head: [["Revendedor", "Status", "Clientes", "Receita"]],
       body: tableData,
     });
 
@@ -281,14 +267,12 @@ const Resellers = () => {
 
   const handleExportCSV = () => {
     if (!resellers) return;
-    const headers = ["Revendedor,Status,Clientes,Receita,Limite,Uso%"];
+    const headers = ["Revendedor,Status,Clientes,Receita"];
     const rows = resellers.map((r) => {
-      const limit = r.limits?.max_clients || 50;
-      const usage = Math.round(((r.client_count || 0) / limit) * 100);
       const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
       const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
       const fmtRev = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rRevenue);
-      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmtRev}",${limit},${usage}`;
+      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmtRev}"`;
     });
 
     const csvContent = "\uFEFF" + headers.concat(rows).join("\n");
@@ -406,9 +390,6 @@ const Resellers = () => {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono">{r.client_count || 0}</TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground font-mono">
-                    {r.limits?.max_clients || "∞"} clientes / {r.limits?.max_messages_month || "∞"} msg
-                  </TableCell>
                   <TableCell>
                     {expiresAt ? (
                       <div className="text-sm">
@@ -514,10 +495,6 @@ const Resellers = () => {
               />
               {newPhoneError && <p className="text-xs text-destructive">{newPhoneError}</p>}
             </div>
-            <div className="space-y-2">
-              <Label>Máx. Clientes</Label>
-              <Input type="number" value={newMaxClients} onChange={(e) => setNewMaxClients(Number(e.target.value))} />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
@@ -538,14 +515,6 @@ const Resellers = () => {
             <div className="space-y-2">
               <Label>Nome de exibição</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Máx. Clientes</Label>
-              <Input type="number" value={editMaxClients} onChange={(e) => setEditMaxClients(Number(e.target.value))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Máx. Mensagens/mês</Label>
-              <Input type="number" value={editMaxMessages} onChange={(e) => setEditMaxMessages(Number(e.target.value))} />
             </div>
           </div>
           <DialogFooter>

@@ -102,8 +102,6 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
     doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 30);
 
     const tableData = resellers.map((r) => {
-      const limit = r.limits?.max_clients || 50;
-      const usage = Math.round(((r.client_count || 0) / limit) * 100);
       const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
       const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
       return [
@@ -111,14 +109,12 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
         r.status === "active" ? "Ativo" : "Suspenso",
         r.client_count || 0,
         fmt(rRevenue),
-        limit,
-        `${usage}%`
       ];
     });
 
     autoTable(doc, {
       startY: 40,
-      head: [["Revendedor", "Status", "Clientes", "Receita", "Limite", "Uso"]],
+      head: [["Revendedor", "Status", "Clientes", "Receita"]],
       body: tableData,
     });
 
@@ -127,13 +123,11 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
 
   const handleExportCSV = () => {
     if (!resellers) return;
-    const headers = ["Revendedor,Status,Clientes,Receita,Limite,Uso%"];
+    const headers = ["Revendedor,Status,Clientes,Receita"];
     const rows = resellers.map((r) => {
-      const limit = r.limits?.max_clients || 50;
-      const usage = Math.round(((r.client_count || 0) / limit) * 100);
       const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
       const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
-      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmt(rRevenue)}",${limit},${usage}`;
+      return `"${r.display_name}",${r.status === "active" ? "Ativo" : "Suspenso"},${r.client_count || 0},"${fmt(rRevenue)}"`;
     });
 
     const csvContent = "\uFEFF" + headers.concat(rows).join("\n"); // Add BOM for Excel Portuguese support
@@ -239,14 +233,10 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-right px-4 py-3 font-medium">Clientes</th>
                 <th className="text-right px-4 py-3 font-medium">Receita</th>
-                <th className="text-right px-4 py-3 font-medium">Limite</th>
-                <th className="text-right px-4 py-3 font-medium">Uso %</th>
               </tr>
             </thead>
             <tbody>
               {resellers.map((r) => {
-                const limit = r.limits?.max_clients || 50;
-                const usage = Math.round(((r.client_count || 0) / limit) * 100);
                 const rClients = clients?.filter((c) => c.reseller_id === r.id) || [];
                 const rRevenue = rClients.reduce((sum, c) => sum + (c.valor || 0), 0);
                 return (
@@ -259,15 +249,6 @@ export function ResellerMetrics({ mask }: ResellerMetricsProps) {
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{r.client_count || 0}</td>
                     <td className="px-4 py-3 text-right font-mono">{fmt(rRevenue)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-muted-foreground">{limit}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 h-2 rounded-full bg-muted overflow-hidden">
-                          <div className={`h-full rounded-full ${usage >= 90 ? "bg-status-expired" : usage >= 70 ? "bg-status-today" : "bg-status-active"}`} style={{ width: `${Math.min(usage, 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-mono text-muted-foreground w-8">{usage}%</span>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
