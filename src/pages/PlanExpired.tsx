@@ -66,7 +66,7 @@ const PlanExpired = () => {
           {isMasterBlocked
             ? "O plano do seu administrador (Master) expirou. Seus serviços estão temporariamente suspensos até que ele renove o plano."
             : plan.isTrial
-              ? "Seu período de teste gratuito de 15 minutos terminou. Para continuar usando o sistema, entre em contato e assine um plano."
+              ? "Seu período de teste gratuito de 7 dias terminou. Para continuar usando o sistema, entre em contato e assine um plano."
               : "Seu plano expirou. Renove para continuar usando o sistema."}
         </p>
 
