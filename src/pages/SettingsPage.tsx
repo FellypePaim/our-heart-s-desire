@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Camera, Lock, Mail, Smartphone, QrCode, Wifi, WifiOff, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { Settings, User, Camera, Lock, Mail, Smartphone, QrCode, Wifi, WifiOff, Loader2, Trash2, RefreshCw, Phone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,10 +30,13 @@ const SettingsPage = () => {
   // WhatsApp instance state
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>("unknown");
   const [pollingActive, setPollingActive] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [linkMethod, setLinkMethod] = useState<"qr" | "phone">("qr");
+  const [pairingPhone, setPairingPhone] = useState("");
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getRoleLabel = () => {
@@ -127,7 +130,7 @@ const SettingsPage = () => {
     };
   }, [pollingActive, fetchStatus, pollingStartTime]);
 
-  const handleCreateAndConnect = async () => {
+  const handleCreateAndConnect = async (method: "qr" | "phone" = "qr") => {
     setWhatsappLoading(true);
     try {
       // Step 1: Create instance if needed
@@ -138,24 +141,45 @@ const SettingsPage = () => {
       if (createError) throw createError;
       if (createData?.error) throw new Error(createData.error);
 
-      // Step 2: Connect (triggers QR code)
+      // Step 2: Connect - pass phone for pairing code, or omit for QR
+      const connectBody: Record<string, unknown> = { action: "connect" };
+      if (method === "phone" && pairingPhone) {
+        // Clean phone: only digits
+        const cleanPhone = pairingPhone.replace(/\D/g, "");
+        connectBody.phone = cleanPhone;
+      }
+
       const { data: connectData, error: connectError } = await supabase.functions.invoke(
         "manage-whatsapp-instance",
-        { body: { action: "connect" } }
+        { body: connectBody }
       );
       if (connectError) throw connectError;
 
-      // Capture QR code from connect response immediately
-      const qr = connectData?.qrCode || connectData?.data?.qrCode || connectData?.data?.qrcode || null;
-      if (qr) {
-        setQrCode(qr);
-        setConnectionStatus("connecting");
+      if (method === "phone") {
+        // Check for pairing code in response
+        const code = connectData?.paircode;
+        if (code) {
+          setPairingCode(code);
+          setConnectionStatus("connecting");
+          toast({ title: "Código de pareamento gerado!", description: `Use o código: ${code}` });
+        } else {
+          toast({ title: "Erro", description: "Não foi possível gerar o código. Tente via QR Code.", variant: "destructive" });
+          setWhatsappLoading(false);
+          return;
+        }
+      } else {
+        // QR Code flow
+        const qr = connectData?.qrCode || connectData?.data?.qrCode || connectData?.data?.qrcode || null;
+        if (qr) {
+          setQrCode(qr);
+          setConnectionStatus("connecting");
+        }
+        toast({ title: "Instância criada! Escaneie o QR Code abaixo." });
       }
 
-      toast({ title: "Instância criada! Escaneie o QR Code abaixo." });
       setPollingStartTime(Date.now());
       setPollingActive(true);
-      if (!qr) await fetchStatus();
+      if (method === "qr" && !connectData?.qrCode) await fetchStatus();
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -228,9 +252,12 @@ const SettingsPage = () => {
 
   const handleRetry = () => {
     setQrCode(null);
+    setPairingCode(null);
     setConnectionStatus("not_created");
     setPollingActive(false);
     setPollingStartTime(null);
+    setPairingPhone("");
+    setLinkMethod("qr");
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -428,14 +455,56 @@ const SettingsPage = () => {
                 </div>
               )}
               
-              <div className="text-center space-y-3">
+              <div className="text-center space-y-4">
                 <p className="font-medium">Vincular WhatsApp</p>
                 <p className="text-sm text-muted-foreground">
-                  Escaneie o QR Code com seu WhatsApp para vincular
+                  Escolha como deseja vincular seu WhatsApp
                 </p>
-                <Button onClick={handleCreateAndConnect} disabled={whatsappLoading} className="gap-2">
-                  {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                  {whatsappLoading ? "Gerando QR Code..." : "Gerar QR Code"}
+
+                {/* Method selector */}
+                <div className="flex gap-2 justify-center">
+                  <Button 
+                    variant={linkMethod === "qr" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => setLinkMethod("qr")}
+                    className="gap-1.5"
+                  >
+                    <QrCode className="h-4 w-4" />
+                    QR Code
+                  </Button>
+                  <Button 
+                    variant={linkMethod === "phone" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => setLinkMethod("phone")}
+                    className="gap-1.5"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Código (celular)
+                  </Button>
+                </div>
+
+                {linkMethod === "phone" && (
+                  <div className="max-w-xs mx-auto space-y-2">
+                    <Label htmlFor="pairing-phone" className="text-sm text-muted-foreground">
+                      Número com DDD e código do país
+                    </Label>
+                    <Input
+                      id="pairing-phone"
+                      value={pairingPhone}
+                      onChange={(e) => setPairingPhone(e.target.value)}
+                      placeholder="5511999999999"
+                      maxLength={15}
+                    />
+                  </div>
+                )}
+
+                <Button 
+                  onClick={() => handleCreateAndConnect(linkMethod)} 
+                  disabled={whatsappLoading || (linkMethod === "phone" && pairingPhone.replace(/\D/g, "").length < 10)} 
+                  className="gap-2"
+                >
+                  {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : linkMethod === "qr" ? <QrCode className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                  {whatsappLoading ? "Gerando..." : linkMethod === "qr" ? "Gerar QR Code" : "Gerar Código"}
                 </Button>
               </div>
             </div>
@@ -444,31 +513,48 @@ const SettingsPage = () => {
           {/* Connecting state with QR code or pairing code */}
           {(connectionStatus === "connecting" || connectionStatus === "qr") && (
             <div className="text-center space-y-4 py-4">
-              <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
-              <p className="text-sm text-muted-foreground">
-                Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
-              </p>
-              {qrCode ? (
-                <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
-                  <img
-                    src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
-                    alt="QR Code WhatsApp"
-                    className="w-64 h-64 object-contain"
-                  />
-                </div>
+              {pairingCode ? (
+                <>
+                  <p className="font-medium">Digite este código no seu WhatsApp</p>
+                  <p className="text-sm text-muted-foreground">
+                    Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo → Vincular por número de telefone
+                  </p>
+                  <div className="inline-block p-6 bg-muted rounded-xl shadow-lg">
+                    <p className="text-3xl font-mono font-bold tracking-[0.3em]">{pairingCode}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O código expira em 5 minutos
+                  </p>
+                </>
+              ) : qrCode ? (
+                <>
+                  <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
+                  <p className="text-sm text-muted-foreground">
+                    Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
+                  </p>
+                  <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
+                    <img
+                      src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
+                      alt="QR Code WhatsApp"
+                      className="w-64 h-64 object-contain"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O QR Code é atualizado automaticamente a cada 5 segundos
+                  </p>
+                </>
               ) : (
                 <div className="inline-flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Carregando QR Code...
+                  Aguardando conexão...
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                O QR Code é atualizado automaticamente a cada 5 segundos
-              </p>
-              <Button variant="outline" size="sm" onClick={handleRetry} className="gap-1.5">
-                <RefreshCw className="h-4 w-4" />
-                Cancelar e tentar novamente
-              </Button>
+              <div>
+                <Button variant="outline" size="sm" onClick={handleRetry} className="gap-1.5">
+                  <RefreshCw className="h-4 w-4" />
+                  Cancelar e tentar novamente
+                </Button>
+              </div>
             </div>
           )}
 
