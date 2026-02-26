@@ -4,11 +4,9 @@ import { Navigate } from "react-router-dom";
 import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
-function formatTime(ms: number) {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
+function formatDaysRemaining(ms: number) {
+  const days = Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+  return `${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
 export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
@@ -16,10 +14,10 @@ export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
   const { data: plan, isLoading } = usePlanStatus();
   const [now, setNow] = useState(Date.now());
 
-  // Tick every second for trial countdown
+  // Tick every minute for trial countdown (days don't need per-second updates)
   useEffect(() => {
     if (!plan?.isTrial || plan.isExpired) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, [plan?.isTrial, plan?.isExpired]);
 
@@ -38,7 +36,7 @@ export function PlanExpiredGuard({ children }: { children: React.ReactNode }) {
       <>
         <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center justify-center gap-2 shrink-0">
           <Clock className="h-4 w-4" />
-          Teste gratuito — tempo restante: {formatTime(remaining)}
+          Teste gratuito — {formatDaysRemaining(remaining)} restantes
         </div>
         {children}
       </>

@@ -43,9 +43,10 @@ export function TrialWelcomeModal() {
 
   if (!plan) return null;
 
-  const remainingMin = Math.max(0, Math.ceil(plan.remainingMs / 60000));
-  const totalTrialMin = 25;
-  const progressPct = Math.min(100, (remainingMin / totalTrialMin) * 100);
+  const totalTrialDays = 7;
+  const remainingMs = Math.max(0, plan.remainingMs);
+  const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+  const progressPct = Math.min(100, (remainingMs / (totalTrialDays * 24 * 60 * 60 * 1000)) * 100);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -70,12 +71,12 @@ export function TrialWelcomeModal() {
                 <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div className="flex-1">
-                <p className="font-bold text-lg leading-tight">
-                  {remainingMin} {remainingMin === 1 ? "minuto" : "minutos"} restantes
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  de {totalTrialMin} minutos de teste gratuito
-                </p>
+                 <p className="font-bold text-lg leading-tight">
+                   {remainingDays} {remainingDays === 1 ? "dia" : "dias"} restantes
+                 </p>
+                 <p className="text-xs text-muted-foreground">
+                   de {totalTrialDays} dias de teste gratuito
+                 </p>
               </div>
             </div>
             <Progress value={progressPct} className="h-2" />
