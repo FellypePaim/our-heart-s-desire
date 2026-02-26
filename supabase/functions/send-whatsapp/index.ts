@@ -52,25 +52,33 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (instError || !instance || !instance.instance_key || !instance.api_token) {
+    if (instError || !instance || !instance.api_token) {
       return new Response(
-        JSON.stringify({ error: "Instância WhatsApp não configurada. Vá em Configurações para vincular." }),
+        JSON.stringify({ error: "WhatsApp não vinculado. Vá em Configurações para conectar." }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Send via UAZAPI
+    const subdomain = Deno.env.get("UAZAPI_SUBDOMAIN");
+    if (!subdomain) {
+      return new Response(
+        JSON.stringify({ error: "UAZAPI_SUBDOMAIN não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Send via UAZAPI using the user's instance token
     const cleanPhone = phone.replace(/\D/g, "");
-    const uazapiUrl = `https://v5.uazapi.com.br/${instance.instance_key}/messages/chat`;
+    const uazapiUrl = `https://${subdomain}.uazapi.com/message/send-text`;
 
     const uazapiResponse = await fetch(uazapiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Admin-Token": instance.api_token,
+        token: instance.api_token,
       },
       body: JSON.stringify({
-        number: cleanPhone,
+        phone: cleanPhone,
         message: message,
       }),
     });
