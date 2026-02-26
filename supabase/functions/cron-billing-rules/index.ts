@@ -109,12 +109,14 @@ Deno.serve(async (req) => {
           );
 
           let statusKey = "";
-          if (diffDays > 15) statusKey = "ativo";
-          else if (diffDays > 3 && diffDays <= 15) statusKey = "vence_15_dias";
-          else if (diffDays > 0 && diffDays <= 3) statusKey = "vence_3_dias";
-          else if (diffDays === 0) statusKey = "vencimento_hoje";
-          else if (diffDays >= -3) statusKey = "vencido";
-          else statusKey = "vencido_mais_3";
+          if (diffDays > 3) statusKey = "active";
+          else if (diffDays === 3) statusKey = "pre3";
+          else if (diffDays === 2) statusKey = "pre2";
+          else if (diffDays === 1) statusKey = "pre1";
+          else if (diffDays === 0) statusKey = "today";
+          else if (diffDays === -1) statusKey = "post1";
+          else if (diffDays === -2) statusKey = "post2";
+          else statusKey = "expired";
 
           if (!rule.status_filter.includes(statusKey)) return false;
         }
