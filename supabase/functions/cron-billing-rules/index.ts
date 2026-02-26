@@ -172,8 +172,7 @@ Deno.serve(async (req) => {
       let sent = 0;
       let failed = 0;
 
-      const baseUrl = subdomain.includes("uazapi.com") ? subdomain.replace(/^https?:\/\//, "https://") : `https://${subdomain}.uazapi.com`;
-      const uazapiUrl = `${baseUrl}/message/send-text`;
+      const uazapiUrl = `https://${subdomain}.uazapi.com/message/send-text`;
 
       for (const client of matchingClients) {
         const phoneClean = client.phone.replace(/\D/g, "");
