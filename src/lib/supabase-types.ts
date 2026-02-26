@@ -72,7 +72,6 @@ export interface Reseller {
   owner_user_id: string;
   display_name: string;
   status: string;
-  limits: { max_clients?: number; max_messages_month?: number };
   created_at: string;
   updated_at: string;
   created_by: string | null;
