@@ -149,6 +149,7 @@ const Resellers = () => {
       });
       toast({ title: "Revendedor criado!", description: `${newDisplayName} (${newEmail}) foi cadastrado com acesso.` });
       queryClient.invalidateQueries({ queryKey: ["resellers"] });
+      invalidateCredits();
       if (isSuperAdmin) {
         const { data: profilesData } = await supabase.functions.invoke("get-user-profiles");
         if (profilesData) setProfiles(profilesData);

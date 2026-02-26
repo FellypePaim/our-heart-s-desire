@@ -105,12 +105,50 @@ Deno.serve(async (req) => {
 
     // If creating a reseller, also create the reseller record
     if (role === "reseller") {
-      await adminClient.from("resellers").insert({
+      const { error: resellerError } = await adminClient.from("resellers").insert({
         owner_user_id: newUser.user.id,
         display_name: name || email.split("@")[0],
-        limits: { max_clients: 50, max_messages_month: 500 },
         created_by: caller.id,
       });
+
+      if (resellerError) {
+        console.error("Failed to create reseller record:", resellerError);
+        return new Response(JSON.stringify({ error: "Reseller record creation failed: " + resellerError.message }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // If caller is a Master (not SuperAdmin), spend 1 credit to activate the reseller
+      if (isPanelAdmin && !isSuperAdmin) {
+        const { data: creditData } = await adminClient
+          .from("credits")
+          .select("id, balance")
+          .eq("user_id", caller.id)
+          .maybeSingle();
+
+        if (!creditData || creditData.balance < 1) {
+          // Rollback: delete the reseller, profile, role and auth user
+          await adminClient.from("resellers").delete().eq("owner_user_id", newUser.user.id);
+          await adminClient.from("profiles").delete().eq("user_id", newUser.user.id);
+          await adminClient.from("user_roles").delete().eq("user_id", newUser.user.id);
+          await adminClient.auth.admin.deleteUser(newUser.user.id);
+          return new Response(JSON.stringify({ error: "Créditos insuficientes para criar revendedor" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Deduct 1 credit
+        await adminClient.from("credits").update({ balance: creditData.balance - 1 }).eq("id", creditData.id);
+
+        // Log transaction
+        await adminClient.from("credit_transactions").insert({
+          user_id: caller.id,
+          amount: -1,
+          type: "spend",
+          target_user_id: newUser.user.id,
+          notes: "Ativação de revendedor: " + (name || email),
+        });
+      }
     }
 
     return new Response(JSON.stringify({ 
