@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
 
     // Send via UAZAPI using the user's instance token
     const cleanPhone = phone.replace(/\D/g, "");
-    const uazapiUrl = `https://${subdomain}.uazapi.com/message/send-text`;
+    const uazapiUrl = `https://${subdomain}.uazapi.com/send/text`;
 
     const uazapiResponse = await fetch(uazapiUrl, {
       method: "POST",
@@ -78,8 +78,8 @@ Deno.serve(async (req) => {
         token: instance.api_token,
       },
       body: JSON.stringify({
-        phone: cleanPhone,
-        message: message,
+        number: cleanPhone,
+        text: message,
       }),
     });
 

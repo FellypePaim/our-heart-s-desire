@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       let sent = 0;
       let failed = 0;
 
-      const uazapiUrl = `https://${subdomain}.uazapi.com/message/send-text`;
+      const uazapiUrl = `https://${subdomain}.uazapi.com/send/text`;
 
       for (const client of matchingClients) {
         const phoneClean = client.phone.replace(/\D/g, "");
@@ -201,8 +201,8 @@ Deno.serve(async (req) => {
               token: instance.api_token,
             },
             body: JSON.stringify({
-              phone: phoneClean,
-              message: text,
+              number: phoneClean,
+              text: text,
             }),
           });
 
