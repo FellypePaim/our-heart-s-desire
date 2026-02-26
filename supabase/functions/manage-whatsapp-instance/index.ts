@@ -177,7 +177,16 @@ Deno.serve(async (req) => {
       });
 
       const connectData = await connectRes.json();
-      return new Response(JSON.stringify({ success: connectRes.ok, data: connectData }), {
+      console.log("UAZAPI connect response keys:", JSON.stringify(Object.keys(connectData)));
+      
+      // Normalize QR code from various possible field names
+      const qrCode = connectData.qrcode || connectData.qrCode || connectData.base64 || connectData.qr || connectData.data?.qrcode || connectData.data?.qrCode || null;
+      
+      return new Response(JSON.stringify({ 
+        success: connectRes.ok, 
+        data: { ...connectData, qrCode },
+        qrCode 
+      }), {
         status: connectRes.ok ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -204,7 +213,16 @@ Deno.serve(async (req) => {
       });
 
       const statusData = await statusRes.json();
-      return new Response(JSON.stringify({ success: true, data: statusData }), {
+      console.log("UAZAPI status response keys:", JSON.stringify(Object.keys(statusData)));
+      
+      // Normalize QR code from various possible field names
+      const qrCode = statusData.qrcode || statusData.qrCode || statusData.base64 || statusData.qr || statusData.data?.qrcode || statusData.data?.qrCode || null;
+      const state = statusData.state || statusData.status || statusData.data?.state || "unknown";
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        data: { ...statusData, qrCode, state } 
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

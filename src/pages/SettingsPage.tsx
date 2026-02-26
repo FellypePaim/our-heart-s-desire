@@ -76,14 +76,17 @@ const SettingsPage = () => {
       const state = data?.data?.state || data?.data?.status || "unknown";
       setConnectionStatus(state);
 
-      if (state === "connecting" && data?.data?.qrCode) {
-        setQrCode(data.data.qrCode);
-      } else if (state === "connected") {
+      // Check multiple possible QR code field names
+      const qr = data?.data?.qrCode || data?.qrCode || data?.data?.qrcode || data?.data?.base64 || null;
+      
+      if ((state === "connecting" || state === "qr") && qr) {
+        setQrCode(qr);
+      } else if (state === "connected" || state === "open") {
         setQrCode(null);
         if (pollingActive) {
           setPollingActive(false);
         }
-      } else {
+      } else if (state !== "connecting" && state !== "qr") {
         setQrCode(null);
       }
     } catch (e: any) {
@@ -127,9 +130,16 @@ const SettingsPage = () => {
       );
       if (connectError) throw connectError;
 
+      // Capture QR code from connect response immediately
+      const qr = connectData?.qrCode || connectData?.data?.qrCode || connectData?.data?.qrcode || null;
+      if (qr) {
+        setQrCode(qr);
+        setConnectionStatus("connecting");
+      }
+
       toast({ title: "Instância criada! Escaneie o QR Code abaixo." });
       setPollingActive(true);
-      await fetchStatus();
+      if (!qr) await fetchStatus();
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -394,7 +404,7 @@ const SettingsPage = () => {
           )}
 
           {/* Connecting state with QR code */}
-          {connectionStatus === "connecting" && (
+          {(connectionStatus === "connecting" || connectionStatus === "qr") && (
             <div className="text-center space-y-4 py-4">
               <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
               <p className="text-sm text-muted-foreground">
