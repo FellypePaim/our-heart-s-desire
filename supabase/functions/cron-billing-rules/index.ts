@@ -24,6 +24,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check if manual execution with specific rule_id
+    let manualRuleId: string | null = null;
+    try {
+      const body = await req.json();
+      manualRuleId = body?.rule_id || null;
+    } catch { /* no body = cron call */ }
+
     // Current time in São Paulo
     const nowStr = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
     const now = new Date(nowStr);
@@ -35,15 +42,28 @@ Deno.serve(async (req) => {
     const [tY, tM, tD] = todayStr.split("-").map(Number);
     const today = new Date(tY, tM - 1, tD);
 
-    // Get active billing rules that match current hour/minute
-    const { data: rules, error: rulesErr } = await supabase
-      .from("billing_rules")
-      .select("*")
-      .eq("is_active", true)
-      .eq("send_hour", currentHour)
-      .eq("send_minute", currentMinute);
+    let rules: any[];
 
-    if (rulesErr) throw rulesErr;
+    if (manualRuleId) {
+      // Manual execution: fetch specific rule, ignore schedule
+      const { data, error } = await supabase
+        .from("billing_rules")
+        .select("*")
+        .eq("id", manualRuleId);
+      if (error) throw error;
+      rules = data || [];
+    } else {
+      // Cron execution: match hour/minute
+      const { data, error } = await supabase
+        .from("billing_rules")
+        .select("*")
+        .eq("is_active", true)
+        .eq("send_hour", currentHour)
+        .eq("send_minute", currentMinute);
+      if (error) throw error;
+      rules = data || [];
+    }
+
     if (!rules || rules.length === 0) {
       return new Response(JSON.stringify({ message: "No rules to run now", hour: currentHour, minute: currentMinute }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -53,17 +73,19 @@ Deno.serve(async (req) => {
     let totalSent = 0;
 
     for (const rule of rules) {
-      // Check if already ran today for this rule
-      const { data: existingLogs } = await supabase
-        .from("billing_rule_logs")
-        .select("id")
-        .eq("rule_id", rule.id)
-        .gte("executed_at", todayStr + "T00:00:00-03:00")
-        .limit(1);
+      // Check if already ran today for this rule (skip for manual runs)
+      if (!manualRuleId) {
+        const { data: existingLogs } = await supabase
+          .from("billing_rule_logs")
+          .select("id")
+          .eq("rule_id", rule.id)
+          .gte("executed_at", todayStr + "T00:00:00-03:00")
+          .limit(1);
 
-      if (existingLogs && existingLogs.length > 0) {
-        console.log(`Rule ${rule.id} already ran today, skipping`);
-        continue;
+        if (existingLogs && existingLogs.length > 0) {
+          console.log(`Rule ${rule.id} already ran today, skipping`);
+          continue;
+        }
       }
 
       // Get the user's whatsapp instance
