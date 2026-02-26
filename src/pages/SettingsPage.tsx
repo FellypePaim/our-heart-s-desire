@@ -1,14 +1,19 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Camera, Lock, Mail, Smartphone } from "lucide-react";
+import { Settings, User, Camera, Lock, Mail, Smartphone, QrCode, Wifi, WifiOff, Loader2, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const SettingsPage = () => {
   const { user, roles } = useAuth();
@@ -22,9 +27,13 @@ const SettingsPage = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  const [uazapiKey, setUazapiKey] = useState("");
-  const [uazapiToken, setUazapiToken] = useState("");
-  const [uazapiLoading, setUazapiLoading] = useState(false);
+  // WhatsApp instance state
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<string>("unknown");
+  const [pollingActive, setPollingActive] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getRoleLabel = () => {
     if (roles.some((r) => r.role === "super_admin" && r.is_active)) return "SuperAdmin";
@@ -34,7 +43,7 @@ const SettingsPage = () => {
   };
 
   // Fetch profile
-  const { data: profile, isLoading: profileFetching } = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -43,31 +52,145 @@ const SettingsPage = () => {
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error) throw error;
-      if (data) {
-        setDisplayName(data.display_name || "");
-      }
+      if (data) setDisplayName(data.display_name || "");
       return data;
     },
     enabled: !!user,
   });
 
-  const { data: whatsappInstance, isLoading: whatsappFetching } = useQuery({
-    queryKey: ["whatsapp_instance", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("whatsapp_instances")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (error && error.code !== "PGRST116") throw error;
-      if (data) {
-        setUazapiKey(data.instance_key || "");
-        setUazapiToken(data.api_token || "");
+  // Fetch whatsapp instance status
+  const fetchStatus = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+        body: { action: "status" },
+      });
+      if (error) throw error;
+
+      if (data?.status === "not_created") {
+        setConnectionStatus("not_created");
+        setQrCode(null);
+        return;
       }
-      return data;
-    },
-    enabled: !!user,
-  });
+
+      const state = data?.data?.state || data?.data?.status || "unknown";
+      setConnectionStatus(state);
+
+      if (state === "connecting" && data?.data?.qrCode) {
+        setQrCode(data.data.qrCode);
+      } else if (state === "connected") {
+        setQrCode(null);
+        if (pollingActive) {
+          setPollingActive(false);
+        }
+      } else {
+        setQrCode(null);
+      }
+    } catch (e: any) {
+      console.error("Status error:", e);
+    }
+  }, [user, pollingActive]);
+
+  // Initial status check
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  // Polling for QR code updates
+  useEffect(() => {
+    if (pollingActive) {
+      pollIntervalRef.current = setInterval(fetchStatus, 5000);
+    }
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [pollingActive, fetchStatus]);
+
+  const handleCreateAndConnect = async () => {
+    setWhatsappLoading(true);
+    try {
+      // Step 1: Create instance if needed
+      const { data: createData, error: createError } = await supabase.functions.invoke(
+        "manage-whatsapp-instance",
+        { body: { action: "create" } }
+      );
+      if (createError) throw createError;
+      if (createData?.error) throw new Error(createData.error);
+
+      // Step 2: Connect (triggers QR code)
+      const { data: connectData, error: connectError } = await supabase.functions.invoke(
+        "manage-whatsapp-instance",
+        { body: { action: "connect" } }
+      );
+      if (connectError) throw connectError;
+
+      toast({ title: "Instância criada! Escaneie o QR Code abaixo." });
+      setPollingActive(true);
+      await fetchStatus();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setWhatsappLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+        body: { action: "disconnect" },
+      });
+      if (error) throw error;
+      setConnectionStatus("disconnected");
+      setQrCode(null);
+      setPollingActive(false);
+      toast({ title: "WhatsApp desconectado!" });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleteConfirmOpen(false);
+    setWhatsappLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+        body: { action: "delete" },
+      });
+      if (error) throw error;
+      setConnectionStatus("not_created");
+      setQrCode(null);
+      setPollingActive(false);
+      queryClient.invalidateQueries({ queryKey: ["whatsapp_instance"] });
+      toast({ title: "Instância removida!" });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  const handleReconnect = async () => {
+    setWhatsappLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+        body: { action: "connect" },
+      });
+      if (error) throw error;
+      setPollingActive(true);
+      await fetchStatus();
+      toast({ title: "Reconectando... Escaneie o QR Code." });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,31 +221,23 @@ const SettingsPage = () => {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
     if (file.size > 2 * 1024 * 1024) {
       toast({ title: "Arquivo muito grande", description: "Máximo 2MB", variant: "destructive" });
       return;
     }
-
     setAvatarUploading(true);
     try {
       const ext = file.name.split(".").pop();
       const path = `${user.id}/avatar.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true });
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
-
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
       const avatarUrl = urlData.publicUrl + "?t=" + Date.now();
-
       if (profile) {
         await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", user.id);
       } else {
         await supabase.from("profiles").insert({ user_id: user.id, avatar_url: avatarUrl, display_name: "" });
       }
-
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({ title: "Avatar atualizado!" });
     } catch (e: any) {
@@ -152,33 +267,22 @@ const SettingsPage = () => {
     }
   };
 
-  const handleSaveUazapi = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setUazapiLoading(true);
-    try {
-      if (whatsappInstance) {
-        const { error } = await supabase
-          .from("whatsapp_instances")
-          .update({ instance_key: uazapiKey.trim(), api_token: uazapiToken.trim() })
-          .eq("user_id", user.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("whatsapp_instances")
-          .insert({ user_id: user.id, instance_key: uazapiKey.trim(), api_token: uazapiToken.trim() });
-        if (error) throw error;
-      }
-      queryClient.invalidateQueries({ queryKey: ["whatsapp_instance"] });
-      toast({ title: "Integração do WhatsApp atualizada!" });
-    } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
-    } finally {
-      setUazapiLoading(false);
+  const initials = (displayName || user?.email || "U").slice(0, 2).toUpperCase();
+
+  const getStatusBadge = () => {
+    switch (connectionStatus) {
+      case "connected":
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1"><Wifi className="h-3 w-3" />Conectado</Badge>;
+      case "connecting":
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 gap-1"><Loader2 className="h-3 w-3 animate-spin" />Conectando...</Badge>;
+      case "disconnected":
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1"><WifiOff className="h-3 w-3" />Desconectado</Badge>;
+      case "not_created":
+        return <Badge variant="outline" className="gap-1 text-muted-foreground"><Smartphone className="h-3 w-3" />Não vinculado</Badge>;
+      default:
+        return <Badge variant="outline" className="gap-1 text-muted-foreground">Verificando...</Badge>;
     }
   };
-
-  const initials = (displayName || user?.email || "U").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -203,7 +307,6 @@ const SettingsPage = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-6">
-            {/* Avatar */}
             <div className="flex flex-col items-center gap-3">
               <Avatar className="h-24 w-24 border-2 border-border">
                 <AvatarImage src={profile?.avatar_url || ""} alt="Avatar" />
@@ -215,23 +318,13 @@ const SettingsPage = () => {
                 {avatarUploading ? "Enviando..." : "Alterar foto"}
               </Button>
             </div>
-
-            {/* Profile form */}
             <form onSubmit={handleSaveProfile} className="flex-1 space-y-4">
               <div className="space-y-2">
                 <Label>Nome de exibição</Label>
-                <Input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Seu nome"
-                  maxLength={100}
-                />
+                <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Seu nome" maxLength={100} />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5" />
-                  E-mail
-                </Label>
+                <Label className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />E-mail</Label>
                 <Input value={user?.email || ""} disabled className="bg-muted" />
               </div>
               <div className="space-y-2">
@@ -259,15 +352,7 @@ const SettingsPage = () => {
           <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
             <div className="space-y-2">
               <Label htmlFor="new-password">Nova senha</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                minLength={6}
-                required
-              />
+              <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" minLength={6} required />
             </div>
             <Button type="submit" disabled={passwordLoading}>
               {passwordLoading ? "Salvando..." : "Alterar Senha"}
@@ -276,45 +361,134 @@ const SettingsPage = () => {
         </CardContent>
       </Card>
 
-      {/* UAZAPI Integration Card */}
+      {/* WhatsApp Integration Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5" />
-            Integração WhatsApp (UAZAPI)
+            WhatsApp
+            {getStatusBadge()}
           </CardTitle>
-          <CardDescription>Configure sua instância do UAZAPI para mensagens automáticas ({whatsappInstance ? "Status Através de Tabela" : "Não configurado"})</CardDescription>
+          <CardDescription>
+            Vincule seu WhatsApp para enviar mensagens automáticas via API
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSaveUazapi} className="space-y-4 max-w-sm">
-            <div className="space-y-2">
-              <Label htmlFor="uazapi-key">Nome/Chave da Instância (Instance Key)</Label>
-              <Input
-                id="uazapi-key"
-                type="text"
-                value={uazapiKey}
-                onChange={(e) => setUazapiKey(e.target.value)}
-                placeholder="Ex: uaz1234..."
-                required
-              />
+        <CardContent className="space-y-4">
+          {/* Not created state */}
+          {connectionStatus === "not_created" && (
+            <div className="text-center space-y-4 py-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <QrCode className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">Nenhum WhatsApp vinculado</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Clique abaixo para vincular seu WhatsApp. Você precisará escanear um QR Code.
+                </p>
+              </div>
+              <Button onClick={handleCreateAndConnect} disabled={whatsappLoading} className="gap-2">
+                {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                {whatsappLoading ? "Criando..." : "Vincular WhatsApp"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="uazapi-token">Token da API (Global/Admin APIKey)</Label>
-              <Input
-                id="uazapi-token"
-                type="password"
-                value={uazapiToken}
-                onChange={(e) => setUazapiToken(e.target.value)}
-                placeholder="Sua API Key do UAZAPI"
-                required
-              />
+          )}
+
+          {/* Connecting state with QR code */}
+          {connectionStatus === "connecting" && (
+            <div className="text-center space-y-4 py-4">
+              <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
+              <p className="text-sm text-muted-foreground">
+                Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
+              </p>
+              {qrCode ? (
+                <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
+                  <img
+                    src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
+                    alt="QR Code WhatsApp"
+                    className="w-64 h-64 object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Carregando QR Code...
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                O QR Code é atualizado automaticamente a cada 5 segundos
+              </p>
             </div>
-            <Button type="submit" disabled={uazapiLoading} className="glass card-hover">
-              {uazapiLoading ? "Salvando..." : "Salvar Configuração"}
-            </Button>
-          </form>
+          )}
+
+          {/* Connected state */}
+          {connectionStatus === "connected" && (
+            <div className="text-center space-y-4 py-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Wifi className="h-8 w-8 text-green-500" />
+              </div>
+              <div>
+                <p className="font-medium text-green-500">WhatsApp Conectado!</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Suas mensagens serão enviadas automaticamente via API.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button variant="outline" size="sm" onClick={fetchStatus} disabled={whatsappLoading} className="gap-1.5">
+                  <RefreshCw className="h-4 w-4" />
+                  Verificar Status
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={whatsappLoading} className="gap-1.5 text-destructive hover:text-destructive">
+                  <WifiOff className="h-4 w-4" />
+                  Desconectar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Disconnected state (instance exists but not connected) */}
+          {connectionStatus === "disconnected" && (
+            <div className="text-center space-y-4 py-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                <WifiOff className="h-8 w-8 text-red-500" />
+              </div>
+              <div>
+                <p className="font-medium text-red-500">WhatsApp Desconectado</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Reconecte escaneando o QR Code novamente.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button onClick={handleReconnect} disabled={whatsappLoading} className="gap-2">
+                  {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Reconectar
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={whatsappLoading} className="gap-1.5">
+                  <Trash2 className="h-4 w-4" />
+                  Remover
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover instância WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá desvincular completamente seu WhatsApp do sistema. Você poderá vincular novamente depois.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
