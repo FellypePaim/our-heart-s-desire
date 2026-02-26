@@ -24,6 +24,7 @@ const SettingsPage = () => {
   const [newPassword, setNewPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [pixKey, setPixKey] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
@@ -56,7 +57,10 @@ const SettingsPage = () => {
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error) throw error;
-      if (data) setDisplayName(data.display_name || "");
+      if (data) {
+        setDisplayName(data.display_name || "");
+        setPixKey((data as any).pix_key || "");
+      }
       return data;
     },
     enabled: !!user,
@@ -268,13 +272,13 @@ const SettingsPage = () => {
       if (profile) {
         const { error } = await supabase
           .from("profiles")
-          .update({ display_name: displayName.trim() })
+          .update({ display_name: displayName.trim(), pix_key: pixKey.trim() } as any)
           .eq("user_id", user.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("profiles")
-          .insert({ user_id: user.id, display_name: displayName.trim() });
+          .insert({ user_id: user.id, display_name: displayName.trim(), pix_key: pixKey.trim() } as any);
         if (error) throw error;
       }
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -402,6 +406,11 @@ const SettingsPage = () => {
               <div className="space-y-2">
                 <Label>Cargo</Label>
                 <Input value={getRoleLabel()} disabled className="bg-muted" />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">🔑 Chave PIX Global</Label>
+                <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="CPF, e-mail, telefone ou chave aleatória" maxLength={255} />
+                <p className="text-xs text-muted-foreground">Usada automaticamente como {"{pix}"} nos templates quando o cliente não tiver uma chave individual.</p>
               </div>
               <Button type="submit" disabled={profileLoading}>
                 {profileLoading ? "Salvando..." : "Salvar Perfil"}

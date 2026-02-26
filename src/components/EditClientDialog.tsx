@@ -27,6 +27,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
   const [form, setForm] = useState({
     name: "", phone: "", plan: "", expiration_date: "", notes: "",
     valor: "", servidor: "", telas: "1", aplicativo: "", dispositivo: "", captacao: "", forma_pagamento: "",
+    login: "", senha: "", pix: "",
   });
   const { user } = useAuth();
   const { toast } = useToast();
@@ -46,6 +47,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
         valor: client.valor ? String(client.valor) : "", servidor: client.servidor || "",
         telas: client.telas ? String(client.telas) : "1", aplicativo: client.aplicativo || "",
         dispositivo: client.dispositivo || "", captacao: client.captacao || "", forma_pagamento: (client as any).forma_pagamento || "",
+        login: (client as any).login || "", senha: (client as any).senha || "", pix: (client as any).pix || "",
       });
       setPhoneError("");
     }
@@ -92,6 +94,7 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
         valor: form.valor ? Number(form.valor) : 0, servidor: form.servidor || "",
         telas: form.telas ? Number(form.telas) : 1, aplicativo: form.aplicativo || "",
         dispositivo: form.dispositivo || "", captacao: form.captacao || "", forma_pagamento: form.forma_pagamento || "",
+        login: form.login || "", senha: form.senha || "", pix: form.pix || "",
       };
 
       const { error } = await supabase.from("clients").update(updateData).eq("id", client.id);
@@ -217,6 +220,18 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Login / Usuário</Label>
+              <Input value={form.login} onChange={(e) => handleChange("login", e.target.value)} placeholder="Login de acesso" />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha</Label>
+              <Input value={form.senha} onChange={(e) => handleChange("senha", e.target.value)} placeholder="Senha de acesso" />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Chave PIX (individual)</Label>
+              <Input value={form.pix} onChange={(e) => handleChange("pix", e.target.value)} placeholder="PIX do cliente (opcional)" />
             </div>
             <div className="space-y-2 col-span-2">
               <Label>Observações</Label>

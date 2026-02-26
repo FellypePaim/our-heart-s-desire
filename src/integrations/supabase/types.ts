@@ -173,11 +173,14 @@ export type Database = {
           forma_pagamento: string | null
           id: string
           is_suspended: boolean | null
+          login: string | null
           name: string
           notes: string | null
           phone: string | null
+          pix: string | null
           plan: string | null
           reseller_id: string | null
+          senha: string | null
           servidor: string | null
           telas: number | null
           updated_at: string
@@ -193,11 +196,14 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           is_suspended?: boolean | null
+          login?: string | null
           name: string
           notes?: string | null
           phone?: string | null
+          pix?: string | null
           plan?: string | null
           reseller_id?: string | null
+          senha?: string | null
           servidor?: string | null
           telas?: number | null
           updated_at?: string
@@ -213,11 +219,14 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           is_suspended?: boolean | null
+          login?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
+          pix?: string | null
           plan?: string | null
           reseller_id?: string | null
+          senha?: string | null
           servidor?: string | null
           telas?: number | null
           updated_at?: string
@@ -332,6 +341,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          pix_key: string | null
           plan_expires_at: string
           plan_type: string
           updated_at: string
@@ -342,6 +352,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          pix_key?: string | null
           plan_expires_at?: string
           plan_type?: string
           updated_at?: string
@@ -352,6 +363,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          pix_key?: string | null
           plan_expires_at?: string
           plan_type?: string
           updated_at?: string
