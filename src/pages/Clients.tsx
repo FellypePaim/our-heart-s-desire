@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
@@ -10,6 +10,7 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2, CalendarDays, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Users, ChevronLeft, ChevronRight, MessageSquare, Eye, EyeOff, Pencil, RefreshCw, Ban, CheckCircle, Trash2, CalendarDays, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 import { WhatsAppMessageDialog } from "@/components/WhatsAppMessageDialog";
 import { BulkWhatsAppDialog } from "@/components/BulkWhatsAppDialog";
 import { BulkRenewDialog } from "@/components/BulkRenewDialog";
@@ -62,6 +63,15 @@ const Clients = () => {
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEditField, setBulkEditField] = useState<string>("");
+  const [bulkEditValue, setBulkEditValue] = useState("");
+  const [bulkEditing, setBulkEditing] = useState(false);
+
   const allStatuses = getAllStatuses();
 
   const statusPriority: Record<StatusKey, number> = {
@@ -103,22 +113,13 @@ const Clients = () => {
       );
     }
 
-    // Sort
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case "name":
-          cmp = a.name.localeCompare(b.name);
-          break;
-        case "expiration_date":
-          cmp = a.expiration_date.localeCompare(b.expiration_date);
-          break;
-        case "plan":
-          cmp = (a.plan || "").localeCompare(b.plan || "");
-          break;
-        case "status":
-          cmp = statusPriority[getStatusFromDate(a.expiration_date).key] - statusPriority[getStatusFromDate(b.expiration_date).key];
-          break;
+        case "name": cmp = a.name.localeCompare(b.name); break;
+        case "expiration_date": cmp = a.expiration_date.localeCompare(b.expiration_date); break;
+        case "plan": cmp = (a.plan || "").localeCompare(b.plan || ""); break;
+        case "status": cmp = statusPriority[getStatusFromDate(a.expiration_date).key] - statusPriority[getStatusFromDate(b.expiration_date).key]; break;
       }
       return sortDir === "desc" ? -cmp : cmp;
     });
@@ -128,10 +129,102 @@ const Clients = () => {
 
   useEffect(() => { setPage(1); }, [search, statusFilter]);
 
+  // Clear selection when filters change
+  useEffect(() => { setSelectedIds(new Set()); }, [search, statusFilter, page]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const title = isReseller ? "Meus Clientes" : "Clientes";
+
+  // Selection helpers
+  const allPageSelected = paged.length > 0 && paged.every((c) => selectedIds.has(c.id));
+  const somePageSelected = paged.some((c) => selectedIds.has(c.id));
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        paged.forEach((c) => next.delete(c.id));
+      } else {
+        paged.forEach((c) => next.add(c.id));
+      }
+      return next;
+    });
+  }, [paged, allPageSelected]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (!user || selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from("clients")
+        .delete()
+        .in("id", ids);
+      if (error) throw error;
+      await logAudit(user.id, "clients_bulk_deleted", "client", undefined, { count: ids.length });
+      toast({ title: "Excluídos!", description: `${ids.length} clientes removidos.` });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  // Bulk edit
+  const handleBulkEdit = async () => {
+    if (!user || selectedIds.size === 0 || !bulkEditField || !bulkEditValue.trim()) return;
+    setBulkEditing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      let updateData: Record<string, any> = {};
+
+      if (bulkEditField === "expiration_date") {
+        updateData = { expiration_date: bulkEditValue };
+      } else if (bulkEditField === "plan") {
+        updateData = { plan: bulkEditValue };
+      } else if (bulkEditField === "valor") {
+        updateData = { valor: Number(bulkEditValue) };
+      } else if (bulkEditField === "servidor") {
+        updateData = { servidor: bulkEditValue };
+      } else if (bulkEditField === "aplicativo") {
+        updateData = { aplicativo: bulkEditValue };
+      }
+
+      const { error } = await supabase
+        .from("clients")
+        .update(updateData)
+        .in("id", ids);
+      if (error) throw error;
+      await logAudit(user.id, "clients_bulk_edited", "client", undefined, { count: ids.length, field: bulkEditField, value: bulkEditValue });
+      toast({ title: "Editados!", description: `${ids.length} clientes atualizados.` });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      setSelectedIds(new Set());
+      setBulkEditOpen(false);
+      setBulkEditField("");
+      setBulkEditValue("");
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setBulkEditing(false);
+    }
+  };
 
   const handleSendMessage = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation();
@@ -147,11 +240,7 @@ const Clients = () => {
       const newDate = new Date(currentDate);
       newDate.setMonth(newDate.getMonth() + 1);
       const newDateStr = newDate.toISOString().split("T")[0];
-
-      const { error } = await supabase
-        .from("clients")
-        .update({ expiration_date: newDateStr })
-        .eq("id", client.id);
+      const { error } = await supabase.from("clients").update({ expiration_date: newDateStr }).eq("id", client.id);
       if (error) throw error;
       await logAudit(user.id, "client_renewed", "client", client.id, { old_date: client.expiration_date, new_date: newDateStr });
       toast({ title: "Renovado!", description: `${client.name} renovado até ${format(newDate, "dd/MM/yyyy", { locale: ptBR })}` });
@@ -165,10 +254,7 @@ const Clients = () => {
     e.stopPropagation();
     if (!user) return;
     try {
-      const { error } = await supabase
-        .from("clients")
-        .update({ is_suspended: !client.is_suspended })
-        .eq("id", client.id);
+      const { error } = await supabase.from("clients").update({ is_suspended: !client.is_suspended }).eq("id", client.id);
       if (error) throw error;
       await logAudit(user.id, client.is_suspended ? "client_unblocked" : "client_blocked", "client", client.id);
       toast({ title: client.is_suspended ? "Desbloqueado!" : "Bloqueado!" });
@@ -188,10 +274,7 @@ const Clients = () => {
     if (!deletingClient || !user) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("clients")
-        .delete()
-        .eq("id", deletingClient.id);
+      const { error } = await supabase.from("clients").delete().eq("id", deletingClient.id);
       if (error) throw error;
       await logAudit(user.id, "client_deleted", "client", deletingClient.id, { name: deletingClient.name });
       toast({ title: "Excluído!", description: `${deletingClient.name} foi removido.` });
@@ -203,7 +286,6 @@ const Clients = () => {
       setDeleting(false);
     }
   };
-
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -235,6 +317,32 @@ const Clients = () => {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50 animate-in fade-in slide-in-from-top-2">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+              setBulkEditField("");
+              setBulkEditValue("");
+              setBulkEditOpen(true);
+            }}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar Selecionados
+            </Button>
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBulkDeleteOpen(true)}>
+              <Trash2 className="h-3.5 w-3.5" />
+              Excluir Selecionados
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelection} title="Limpar seleção">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -262,6 +370,14 @@ const Clients = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allPageSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Selecionar todos"
+                  className={somePageSelected && !allPageSelected ? "opacity-50" : ""}
+                />
+              </TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
                 <span className="flex items-center">Nome <SortIcon field="name" /></span>
               </TableHead>
@@ -281,17 +397,25 @@ const Clients = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado</TableCell>
               </TableRow>
             ) : (
               paged.map((client) => {
                 const status = getStatusFromDate(client.expiration_date);
+                const isChecked = selectedIds.has(client.id);
                 return (
-                  <TableRow key={client.id} className="cursor-pointer" onClick={() => setSelectedClient(client)}>
+                  <TableRow key={client.id} className={cn("cursor-pointer", isChecked && "bg-muted/40")} onClick={() => setSelectedClient(client)}>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => toggleSelect(client.id)}
+                        aria-label={`Selecionar ${client.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell className="text-muted-foreground">{mask(client.phone, "phone")}</TableCell>
                     <TableCell>{client.plan || "-"}</TableCell>
@@ -346,6 +470,7 @@ const Clients = () => {
       <BulkWhatsAppDialog clients={clients || []} open={bulkOpen} onOpenChange={setBulkOpen} />
       <BulkRenewDialog clients={clients || []} open={bulkRenewOpen} onOpenChange={setBulkRenewOpen} />
 
+      {/* Single delete dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -358,6 +483,63 @@ const Clients = () => {
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteClient} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete dialog */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selectedIds.size} clientes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{selectedIds.size}</strong> cliente{selectedIds.size > 1 ? "s" : ""}? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={bulkDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {bulkDeleting ? "Excluindo..." : `Excluir ${selectedIds.size}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk edit dialog */}
+      <AlertDialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar {selectedIds.size} clientes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione o campo e o novo valor para aplicar a todos os clientes selecionados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <Select value={bulkEditField} onValueChange={(v) => { setBulkEditField(v); setBulkEditValue(""); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o campo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expiration_date">Vencimento</SelectItem>
+                <SelectItem value="plan">Plano</SelectItem>
+                <SelectItem value="valor">Valor</SelectItem>
+                <SelectItem value="servidor">Servidor</SelectItem>
+                <SelectItem value="aplicativo">Aplicativo</SelectItem>
+              </SelectContent>
+            </Select>
+            {bulkEditField === "expiration_date" ? (
+              <Input type="date" value={bulkEditValue} onChange={(e) => setBulkEditValue(e.target.value)} />
+            ) : bulkEditField === "valor" ? (
+              <Input type="number" placeholder="Novo valor" value={bulkEditValue} onChange={(e) => setBulkEditValue(e.target.value)} />
+            ) : bulkEditField ? (
+              <Input placeholder="Novo valor" value={bulkEditValue} onChange={(e) => setBulkEditValue(e.target.value)} />
+            ) : null}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkEditing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkEdit} disabled={bulkEditing || !bulkEditField || !bulkEditValue.trim()}>
+              {bulkEditing ? "Salvando..." : `Aplicar a ${selectedIds.size}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
