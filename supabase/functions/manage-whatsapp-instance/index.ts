@@ -215,9 +215,10 @@ Deno.serve(async (req) => {
       const statusData = await statusRes.json();
       console.log("UAZAPI status response keys:", JSON.stringify(Object.keys(statusData)));
       
-      // Normalize QR code from various possible field names
-      const qrCode = statusData.qrcode || statusData.qrCode || statusData.base64 || statusData.qr || statusData.data?.qrcode || statusData.data?.qrCode || null;
-      const state = statusData.state || statusData.status || statusData.data?.state || "unknown";
+      // Normalize QR code from various possible field names including nested instance
+      const qrCode = statusData.qrcode || statusData.qrCode || statusData.base64 || statusData.qr || statusData.instance?.qrcode || statusData.data?.qrcode || statusData.data?.qrCode || null;
+      const instanceStatus = statusData.instance?.status || "unknown";
+      const state = (typeof statusData.state === "string" ? statusData.state : null) || instanceStatus || statusData.status || "unknown";
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -307,13 +308,26 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Try multiple possible UAZAPI pairing code endpoints
-      let pairRes;
-      let pairData;
-      
-      // Try /instance/pairingcode first
+      // First ensure the instance is connecting (call connect)
       try {
-        pairRes = await fetch(`${baseUrl}/instance/pairingcode`, {
+        await fetch(`${baseUrl}/instance/connect`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: instance.api_token,
+          },
+        });
+        // Small delay to let the instance initialize
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (e) {
+        console.log("Connect before pairing failed:", e);
+      }
+
+      // Now request pairing code
+      let code: string | null = null;
+      
+      try {
+        const pairRes = await fetch(`${baseUrl}/instance/pairingcode`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -321,16 +335,17 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({ phone: pairingPhone }),
         });
-        pairData = await pairRes.json();
+        const pairData = await pairRes.json();
         console.log("UAZAPI pairingcode response:", JSON.stringify(pairData));
+        code = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
       } catch (e) {
-        console.log("pairingcode endpoint failed, trying alternative");
+        console.error("pairingcode endpoint failed:", e);
       }
 
-      // If that didn't work, try /instance/connect with phone
-      if (!pairRes?.ok || (!pairData?.code && !pairData?.pairingCode)) {
+      // Fallback: try connect with pairingCode flag
+      if (!code) {
         try {
-          pairRes = await fetch(`${baseUrl}/instance/connect`, {
+          const pairRes2 = await fetch(`${baseUrl}/instance/connect`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -338,21 +353,19 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({ pairingCode: true, phone: pairingPhone }),
           });
-          pairData = await pairRes.json();
-          console.log("UAZAPI connect+pairing response:", JSON.stringify(pairData));
+          const pairData2 = await pairRes2.json();
+          console.log("UAZAPI connect+pairing response:", JSON.stringify(pairData2));
+          code = pairData2?.code || pairData2?.pairingCode || pairData2?.instance?.paircode || null;
         } catch (e) {
           console.error("pairing via connect also failed:", e);
         }
       }
 
-      const code = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
-
       return new Response(JSON.stringify({ 
         success: !!code, 
         code,
-        data: pairData 
       }), {
-        status: code ? 200 : 502,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
