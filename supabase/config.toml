@@ -15,3 +15,7 @@ verify_jwt = false
 [functions.ai-chat]
 enabled = true
 verify_jwt = false
+
+[functions.cron-billing-rules]
+enabled = true
+verify_jwt = false
