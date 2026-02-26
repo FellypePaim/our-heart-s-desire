@@ -58,7 +58,14 @@ export function WhatsAppMessageDialog({ client, open, onOpenChange }: WhatsAppMe
     return text
       .replace(/\{nome\}/g, client.name)
       .replace(/\{plano\}/g, client.plan || "Sem plano")
-      .replace(/\{vencimento\}/g, expirationFormatted);
+      .replace(/\{vencimento\}/g, expirationFormatted)
+      .replace(/\{valor\}/g, client.valor ? String(client.valor).replace(".", ",") : "0,00")
+      .replace(/\{servidor\}/g, client.servidor || "—")
+      .replace(/\{usuario\}/g, client.phone || "—")
+      .replace(/\{senha\}/g, "—")
+      .replace(/\{app\}/g, client.aplicativo || "—")
+      .replace(/\{telas\}/g, String(client.telas || 1))
+      .replace(/\{pix\}/g, "—");
   };
 
   const previewMessage = useMemo(() => {

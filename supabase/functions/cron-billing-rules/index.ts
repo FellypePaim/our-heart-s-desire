@@ -184,7 +184,14 @@ Deno.serve(async (req) => {
         let text = rule.message_template
           .replace(/\{nome\}/g, client.name)
           .replace(/\{plano\}/g, client.plan || "")
-          .replace(/\{vencimento\}/g, formattedDate);
+          .replace(/\{vencimento\}/g, formattedDate)
+          .replace(/\{valor\}/g, client.valor ? String(client.valor).replace(".", ",") : "0,00")
+          .replace(/\{servidor\}/g, client.servidor || "—")
+          .replace(/\{usuario\}/g, client.phone || "—")
+          .replace(/\{senha\}/g, "—")
+          .replace(/\{app\}/g, client.aplicativo || "—")
+          .replace(/\{telas\}/g, String(client.telas || 1))
+          .replace(/\{pix\}/g, "—");
 
         // Random delay between min and max (minimum 3s to avoid WhatsApp spam ban)
         const safeMin = Math.max(3, rule.delay_min);
