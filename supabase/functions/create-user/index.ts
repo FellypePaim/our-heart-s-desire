@@ -97,11 +97,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create profile with trial plan (trigger will set plan_expires_at)
+    // Create profile - for resellers set 30 days, others get default trial via trigger
     await adminClient.from("profiles").insert({
       user_id: newUser.user.id,
       display_name: name || email.split("@")[0],
     });
+
+    // If reseller, override the trial trigger to set 30 days monthly plan
+    if (role === "reseller") {
+      await adminClient.from("profiles").update({
+        plan_type: "monthly",
+        plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      }).eq("user_id", newUser.user.id);
+    }
 
     // If creating a reseller, also create the reseller record
     if (role === "reseller") {
