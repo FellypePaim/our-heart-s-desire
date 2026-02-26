@@ -15,7 +15,6 @@ const UAZAPI_ADMIN_TOKEN = () => {
 const UAZAPI_BASE = () => {
   let sub = Deno.env.get("UAZAPI_SUBDOMAIN");
   if (!sub) throw new Error("UAZAPI_SUBDOMAIN não configurado");
-  // Handle cases where the full URL or domain was stored instead of just the subdomain
   sub = sub.replace(/^https?:\/\//, "").replace(/\.uazapi\.com.*$/, "").replace(/\//g, "");
   return `https://${sub}.uazapi.com`;
 };
@@ -57,7 +56,6 @@ Deno.serve(async (req) => {
 
     // ---- CREATE INSTANCE ----
     if (action === "create") {
-      // Check if user already has an instance
       const { data: existing } = await supabase
         .from("whatsapp_instances")
         .select("*")
@@ -65,7 +63,6 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existing?.instance_key && existing?.api_token) {
-        // Instance already exists, just return status
         return new Response(JSON.stringify({ 
           success: true, 
           message: "Instância já existe",
@@ -76,7 +73,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create new instance on UAZAPI
       const instanceName = `brave-${user.id.substring(0, 8)}-${Date.now()}`;
       const createRes = await fetch(`${baseUrl}/instance/init`, {
         method: "POST",
@@ -100,7 +96,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Save instance token to DB
       const instanceToken = createData.token || createData.instance?.token || "";
       const instanceKey = createData.name || createData.instance?.name || instanceName;
 
@@ -118,11 +113,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Auto-set webhook for disconnect/connect notifications
+      // Auto-set webhook
       try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const webhookUrl = `${supabaseUrl}/functions/v1/uazapi-webhook`;
-        
         await fetch(`${baseUrl}/webhook/set`, {
           method: "POST",
           headers: {
@@ -135,13 +128,10 @@ Deno.serve(async (req) => {
             events: ["connection.update", "status.instance", "disconnect"],
           }),
         });
-
-        // Mark webhook as set
         await supabase
           .from("whatsapp_instances")
           .update({ webhook_set: true })
           .eq("instance_key", instanceKey);
-
         console.log("Webhook set for instance:", instanceKey);
       } catch (webhookErr) {
         console.error("Failed to set webhook:", webhookErr);
@@ -153,7 +143,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ---- CONNECT (triggers QR code generation) ----
+    // ---- CONNECT (QR Code or Pairing Code) ----
+    // Per UAZAPI docs: POST /instance/connect
+    //   - Without "phone" field → generates QR Code
+    //   - With "phone" field → generates 8-digit pairing code
     if (action === "connect") {
       const { data: instance } = await supabase
         .from("whatsapp_instances")
@@ -168,31 +161,47 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Build request body - if phone is provided, UAZAPI returns pairing code instead of QR
+      const connectBody: Record<string, unknown> = {};
+      if (pairingPhone) {
+        connectBody.phone = pairingPhone;
+      }
+
       const connectRes = await fetch(`${baseUrl}/instance/connect`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           token: instance.api_token,
         },
+        body: JSON.stringify(connectBody),
       });
 
       const connectData = await connectRes.json();
-      console.log("UAZAPI connect response keys:", JSON.stringify(Object.keys(connectData)));
+      console.log("UAZAPI connect response:", JSON.stringify(connectData).substring(0, 500));
       
-      // Normalize QR code from various possible field names including nested instance
-      const qrCode = connectData.qrcode || connectData.qrCode || connectData.base64 || connectData.qr || connectData.instance?.qrcode || connectData.data?.qrcode || connectData.data?.qrCode || null;
+      // Extract QR code (when no phone was sent)
+      const qrCode = connectData.qrcode || connectData.qrCode || connectData.base64 || connectData.qr || 
+                      connectData.instance?.qrcode || connectData.data?.qrcode || connectData.data?.qrCode || null;
+      
+      // Extract pairing code (when phone was sent)
+      const paircode = connectData.paircode || connectData.code || connectData.pairingCode || 
+                       connectData.instance?.paircode || connectData.data?.paircode || connectData.data?.code || null;
+
+      // Only return valid pairing codes (string with 4+ chars, not empty)
+      const validPaircode = (typeof paircode === "string" && paircode.length >= 4) ? paircode : null;
       
       return new Response(JSON.stringify({ 
         success: connectRes.ok, 
         data: { ...connectData, qrCode },
-        qrCode 
+        qrCode,
+        paircode: validPaircode,
       }), {
         status: connectRes.ok ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ---- STATUS (get QR code + connection state) ----
+    // ---- STATUS ----
     if (action === "status") {
       const { data: instance } = await supabase
         .from("whatsapp_instances")
@@ -213,10 +222,9 @@ Deno.serve(async (req) => {
       });
 
       const statusData = await statusRes.json();
-      console.log("UAZAPI status response keys:", JSON.stringify(Object.keys(statusData)));
       
-      // Normalize QR code from various possible field names including nested instance
-      const qrCode = statusData.qrcode || statusData.qrCode || statusData.base64 || statusData.qr || statusData.instance?.qrcode || statusData.data?.qrcode || statusData.data?.qrCode || null;
+      const qrCode = statusData.qrcode || statusData.qrCode || statusData.base64 || statusData.qr || 
+                      statusData.instance?.qrcode || statusData.data?.qrcode || statusData.data?.qrCode || null;
       const instanceStatus = statusData.instance?.status || "unknown";
       const state = (typeof statusData.state === "string" ? statusData.state : null) || instanceStatus || statusData.status || "unknown";
       
@@ -271,106 +279,14 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Delete from UAZAPI
       await fetch(`${baseUrl}/instance/delete`, {
         method: "DELETE",
         headers: { token: instance.api_token },
       });
 
-      // Remove from DB
       await supabase.from("whatsapp_instances").delete().eq("user_id", user.id);
 
       return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ---- PAIRING CODE (link via phone number) ----
-    if (action === "pairingcode") {
-      const { data: instance } = await supabase
-        .from("whatsapp_instances")
-        .select("instance_key, api_token")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!instance?.api_token) {
-        return new Response(
-          JSON.stringify({ error: "Instância não encontrada. Crie uma primeiro." }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (!pairingPhone) {
-        return new Response(
-          JSON.stringify({ error: "Número de telefone é obrigatório" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // First ensure the instance is connecting (call connect)
-      try {
-        await fetch(`${baseUrl}/instance/connect`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            token: instance.api_token,
-          },
-        });
-        // Small delay to let the instance initialize
-        await new Promise(r => setTimeout(r, 2000));
-      } catch (e) {
-        console.log("Connect before pairing failed:", e);
-      }
-
-      // Now request pairing code
-      let code: string | null = null;
-      
-      // Try GET /instance/pairingcode with query params
-      try {
-        const pairRes = await fetch(`${baseUrl}/instance/pairingcode?phone=${pairingPhone}`, {
-          method: "GET",
-          headers: {
-            token: instance.api_token,
-          },
-        });
-        const pairData = await pairRes.json();
-        console.log("UAZAPI pairingcode GET response:", JSON.stringify(pairData));
-        // Only accept string codes with 4+ chars (avoid picking up HTTP status codes)
-        const rawCode = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
-        if (typeof rawCode === "string" && rawCode.length >= 4) {
-          code = rawCode;
-        }
-      } catch (e) {
-        console.error("pairingcode GET endpoint failed:", e);
-      }
-
-      // Fallback: try connect with pairingCode flag
-      if (!code) {
-        try {
-          const pairRes2 = await fetch(`${baseUrl}/instance/connect`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              token: instance.api_token,
-            },
-            body: JSON.stringify({ pairingCode: true, phone: pairingPhone }),
-          });
-          const pairData2 = await pairRes2.json();
-          console.log("UAZAPI connect+pairing response keys:", JSON.stringify(Object.keys(pairData2)));
-          const rawCode2 = pairData2?.code || pairData2?.pairingCode || pairData2?.paircode || pairData2?.instance?.paircode || null;
-          if (typeof rawCode2 === "string" && rawCode2.length >= 4) {
-            code = rawCode2;
-          }
-        } catch (e) {
-          console.error("pairing via connect also failed:", e);
-        }
-      }
-
-      return new Response(JSON.stringify({ 
-        success: !!code, 
-        code,
-      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
