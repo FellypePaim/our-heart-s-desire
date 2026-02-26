@@ -179,8 +179,8 @@ Deno.serve(async (req) => {
       const connectData = await connectRes.json();
       console.log("UAZAPI connect response keys:", JSON.stringify(Object.keys(connectData)));
       
-      // Normalize QR code from various possible field names
-      const qrCode = connectData.qrcode || connectData.qrCode || connectData.base64 || connectData.qr || connectData.data?.qrcode || connectData.data?.qrCode || null;
+      // Normalize QR code from various possible field names including nested instance
+      const qrCode = connectData.qrcode || connectData.qrCode || connectData.base64 || connectData.qr || connectData.instance?.qrcode || connectData.data?.qrcode || connectData.data?.qrCode || null;
       
       return new Response(JSON.stringify({ 
         success: connectRes.ok, 
