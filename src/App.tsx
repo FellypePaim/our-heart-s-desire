@@ -29,6 +29,7 @@ import AdminServiceConfig from "./pages/admin/AdminServiceConfig";
 import AdminPlans from "./pages/admin/AdminPlans";
 import ServiceConfig from "./pages/ServiceConfig";
 import Reports from "./pages/Reports";
+import BillingRules from "./pages/BillingRules";
 import PlanExpired from "./pages/PlanExpired";
 
 const queryClient = new QueryClient();
@@ -136,6 +137,7 @@ function ProtectedLayout() {
               <Route path="/clients" element={<Clients />} />
               <Route path="/resellers" element={<RequireRole roles={["panel_admin", "super_admin"]}><Resellers /></RequireRole>} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/billing" element={<BillingRules />} />
               <Route path="/service-config" element={<ServiceConfig />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/reports" element={<Reports />} />
