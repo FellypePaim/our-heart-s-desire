@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
+import { useMyReseller } from "@/hooks/useResellers";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -90,9 +91,11 @@ export function ImportClientsDialog() {
   const [importing, setImporting] = useState(false);
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
+  const { data: myReseller } = useMyReseller();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isReseller = roles.some((r) => r.role === "reseller" && r.is_active);
 
   const { validCount, errorCount } = useMemo(() => {
     const valid = rows.filter((r) => r.errors.length === 0).length;
@@ -153,6 +156,7 @@ export function ImportClientsDialog() {
     try {
       const insertData = validRows.map((r) => ({
         user_id: user.id,
+        ...(isReseller && myReseller ? { reseller_id: myReseller.id } : {}),
         name: r.name,
         phone: r.phone || null,
         expiration_date: r.expiration_date,
