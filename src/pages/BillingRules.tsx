@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Zap, Plus, Pencil, Trash2, Power, PowerOff, Clock, Users, Calendar,
   MessageSquare, Activity, History, CheckCircle, XCircle, AlertTriangle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Play, Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ const BillingRules = () => {
   const [editingRule, setEditingRule] = useState<BillingRule | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
+  const [runningRuleId, setRunningRuleId] = useState<string | null>(null);
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ["billing_rules", user?.id],
@@ -130,6 +131,27 @@ const BillingRules = () => {
   const handleNew = () => {
     setEditingRule(null);
     setDialogOpen(true);
+  };
+
+  const handleRunNow = async (ruleId: string) => {
+    setRunningRuleId(ruleId);
+    try {
+      const { data, error } = await supabase.functions.invoke("cron-billing-rules", {
+        body: { rule_id: ruleId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Execução concluída",
+        description: `${data?.total_sent || 0} mensagens enviadas de ${data?.rules_processed || 0} regras processadas.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["billing_rules"] });
+      queryClient.invalidateQueries({ queryKey: ["billing_rule_logs"] });
+    } catch (e: any) {
+      toast({ title: "Erro ao executar", description: e.message, variant: "destructive" });
+    } finally {
+      setRunningRuleId(null);
+    }
   };
 
   const getFilterLabel = (rule: BillingRule) => {
@@ -300,6 +322,19 @@ const BillingRules = () => {
                         checked={rule.is_active}
                         onCheckedChange={() => handleToggle(rule)}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRunNow(rule.id)}
+                        disabled={runningRuleId === rule.id}
+                        title="Executar agora"
+                      >
+                        {runningRuleId === rule.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4 text-green-600" />
+                        )}
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(rule)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
