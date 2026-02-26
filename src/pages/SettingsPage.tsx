@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Camera, Lock, Mail, Smartphone, QrCode, Wifi, WifiOff, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { Settings, User, Camera, Lock, Mail, Smartphone, QrCode, Wifi, WifiOff, Loader2, Trash2, RefreshCw, Hash } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,11 @@ const SettingsPage = () => {
   const [connectionStatus, setConnectionStatus] = useState<string>("unknown");
   const [pollingActive, setPollingActive] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingLoading, setPairingLoading] = useState(false);
+  const [linkMethod, setLinkMethod] = useState<"qr" | "code">("qr");
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getRoleLabel = () => {
@@ -99,10 +104,20 @@ const SettingsPage = () => {
     fetchStatus();
   }, [fetchStatus]);
 
-  // Polling for QR code updates
+  // Polling for QR code updates with 2-minute timeout
   useEffect(() => {
     if (pollingActive) {
-      pollIntervalRef.current = setInterval(fetchStatus, 5000);
+      pollIntervalRef.current = setInterval(() => {
+        // Check timeout (2 minutes)
+        if (pollingStartTime && Date.now() - pollingStartTime > 120000) {
+          setPollingActive(false);
+          setQrCode(null);
+          setConnectionStatus("timeout");
+          toast({ title: "Tempo esgotado", description: "O QR Code expirou. Tente novamente.", variant: "destructive" });
+          return;
+        }
+        fetchStatus();
+      }, 5000);
     }
     return () => {
       if (pollIntervalRef.current) {
@@ -110,7 +125,7 @@ const SettingsPage = () => {
         pollIntervalRef.current = null;
       }
     };
-  }, [pollingActive, fetchStatus]);
+  }, [pollingActive, fetchStatus, pollingStartTime]);
 
   const handleCreateAndConnect = async () => {
     setWhatsappLoading(true);
@@ -138,6 +153,7 @@ const SettingsPage = () => {
       }
 
       toast({ title: "Instância criada! Escaneie o QR Code abaixo." });
+      setPollingStartTime(Date.now());
       setPollingActive(true);
       if (!qr) await fetchStatus();
     } catch (e: any) {
@@ -188,18 +204,72 @@ const SettingsPage = () => {
   const handleReconnect = async () => {
     setWhatsappLoading(true);
     try {
-      const { error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      const { data: connectData, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
         body: { action: "connect" },
       });
       if (error) throw error;
+      
+      const qr = connectData?.qrCode || connectData?.data?.qrCode || null;
+      if (qr) {
+        setQrCode(qr);
+        setConnectionStatus("connecting");
+      }
+      
+      setPollingStartTime(Date.now());
       setPollingActive(true);
-      await fetchStatus();
+      if (!qr) await fetchStatus();
       toast({ title: "Reconectando... Escaneie o QR Code." });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setWhatsappLoading(false);
     }
+  };
+
+  const handlePairingCode = async () => {
+    if (!pairingPhone.trim()) {
+      toast({ title: "Digite seu número de telefone", variant: "destructive" });
+      return;
+    }
+    setPairingLoading(true);
+    setPairingCode(null);
+    try {
+      // Ensure instance exists first
+      const { data: createData, error: createError } = await supabase.functions.invoke(
+        "manage-whatsapp-instance",
+        { body: { action: "create" } }
+      );
+      if (createError) throw createError;
+      if (createData?.error) throw new Error(createData.error);
+
+      // Request pairing code
+      const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+        body: { action: "pairingcode", phone: pairingPhone.replace(/\D/g, "") },
+      });
+      if (error) throw error;
+      
+      if (data?.code) {
+        setPairingCode(data.code);
+        setConnectionStatus("connecting");
+        setPollingStartTime(Date.now());
+        setPollingActive(true);
+        toast({ title: "Código gerado! Digite no seu WhatsApp." });
+      } else {
+        toast({ title: "Erro", description: "Não foi possível gerar o código. Tente via QR Code.", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setPairingLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setQrCode(null);
+    setPairingCode(null);
+    setConnectionStatus("not_created");
+    setPollingActive(false);
+    setPollingStartTime(null);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -282,13 +352,17 @@ const SettingsPage = () => {
   const getStatusBadge = () => {
     switch (connectionStatus) {
       case "connected":
+      case "open":
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1"><Wifi className="h-3 w-3" />Conectado</Badge>;
       case "connecting":
+      case "qr":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 gap-1"><Loader2 className="h-3 w-3 animate-spin" />Conectando...</Badge>;
       case "disconnected":
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1"><WifiOff className="h-3 w-3" />Desconectado</Badge>;
       case "not_created":
         return <Badge variant="outline" className="gap-1 text-muted-foreground"><Smartphone className="h-3 w-3" />Não vinculado</Badge>;
+      case "timeout":
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1">⏰ Expirado</Badge>;
       default:
         return <Badge variant="outline" className="gap-1 text-muted-foreground">Verificando...</Badge>;
     }
@@ -384,54 +458,132 @@ const SettingsPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Not created state */}
-          {connectionStatus === "not_created" && (
-            <div className="text-center space-y-4 py-4">
-              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                <QrCode className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">Nenhum WhatsApp vinculado</p>
+          {/* Not created / timeout state */}
+          {(connectionStatus === "not_created" || connectionStatus === "timeout") && (
+            <div className="space-y-4 py-4">
+              {connectionStatus === "timeout" && (
+                <div className="text-center p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                  ⏰ O tempo de vinculação expirou. Tente novamente.
+                </div>
+              )}
+              
+              <div className="text-center">
+                <p className="font-medium">Vincular WhatsApp</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Clique abaixo para vincular seu WhatsApp. Você precisará escanear um QR Code.
+                  Escolha como deseja vincular seu WhatsApp
                 </p>
               </div>
-              <Button onClick={handleCreateAndConnect} disabled={whatsappLoading} className="gap-2">
-                {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                {whatsappLoading ? "Criando..." : "Vincular WhatsApp"}
+
+              {/* Method selector */}
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant={linkMethod === "qr" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLinkMethod("qr")}
+                  className="gap-1.5"
+                >
+                  <QrCode className="h-4 w-4" />
+                  QR Code
+                </Button>
+                <Button
+                  variant={linkMethod === "code" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLinkMethod("code")}
+                  className="gap-1.5"
+                >
+                  <Hash className="h-4 w-4" />
+                  Código (celular)
+                </Button>
+              </div>
+
+              {/* QR Code method */}
+              {linkMethod === "qr" && (
+                <div className="text-center space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Use um computador ou tablet para escanear o QR Code
+                  </p>
+                  <Button onClick={handleCreateAndConnect} disabled={whatsappLoading} className="gap-2">
+                    {whatsappLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                    {whatsappLoading ? "Gerando QR Code..." : "Gerar QR Code"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Pairing code method */}
+              {linkMethod === "code" && (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Digite o número do seu WhatsApp (com DDD) para receber um código de vinculação
+                  </p>
+                  <div className="flex gap-2 max-w-sm mx-auto">
+                    <Input
+                      placeholder="5511999999999"
+                      value={pairingPhone}
+                      onChange={(e) => setPairingPhone(e.target.value)}
+                      className="text-center"
+                    />
+                    <Button onClick={handlePairingCode} disabled={pairingLoading} className="gap-1.5 shrink-0">
+                      {pairingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Hash className="h-4 w-4" />}
+                      {pairingLoading ? "Gerando..." : "Gerar"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Connecting state with QR code or pairing code */}
+          {(connectionStatus === "connecting" || connectionStatus === "qr") && (
+            <div className="text-center space-y-4 py-4">
+              {pairingCode ? (
+                <>
+                  <p className="font-medium">Digite o código no seu WhatsApp</p>
+                  <p className="text-sm text-muted-foreground">
+                    Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo → Vincular com número de telefone
+                  </p>
+                  <div className="inline-block px-8 py-4 bg-card border-2 border-primary rounded-xl shadow-lg">
+                    <p className="text-3xl font-mono font-bold tracking-[0.3em] text-primary">
+                      {pairingCode}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O código expira em 2 minutos
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
+                  <p className="text-sm text-muted-foreground">
+                    Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
+                  </p>
+                  {qrCode ? (
+                    <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
+                      <img
+                        src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
+                        alt="QR Code WhatsApp"
+                        className="w-64 h-64 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Carregando QR Code...
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    O QR Code é atualizado automaticamente a cada 5 segundos
+                  </p>
+                </>
+              )}
+              <Button variant="outline" size="sm" onClick={handleRetry} className="gap-1.5">
+                <RefreshCw className="h-4 w-4" />
+                Cancelar e tentar novamente
               </Button>
             </div>
           )}
 
-          {/* Connecting state with QR code */}
-          {(connectionStatus === "connecting" || connectionStatus === "qr") && (
-            <div className="text-center space-y-4 py-4">
-              <p className="font-medium">Escaneie o QR Code com seu WhatsApp</p>
-              <p className="text-sm text-muted-foreground">
-                Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
-              </p>
-              {qrCode ? (
-                <div className="inline-block p-4 bg-white rounded-xl shadow-lg">
-                  <img
-                    src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
-                    alt="QR Code WhatsApp"
-                    className="w-64 h-64 object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Carregando QR Code...
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                O QR Code é atualizado automaticamente a cada 5 segundos
-              </p>
-            </div>
-          )}
-
           {/* Connected state */}
-          {connectionStatus === "connected" && (
+          {(connectionStatus === "connected" || connectionStatus === "open") && (
             <div className="text-center space-y-4 py-4">
               <div className="mx-auto w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
                 <Wifi className="h-8 w-8 text-green-500" />
