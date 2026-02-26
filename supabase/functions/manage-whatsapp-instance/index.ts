@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action } = await req.json();
+    const { action, phone: pairingPhone } = await req.json();
     const baseUrl = UAZAPI_BASE();
     const adminToken = UAZAPI_ADMIN_TOKEN();
 
@@ -281,6 +281,78 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ---- PAIRING CODE (link via phone number) ----
+    if (action === "pairingcode") {
+      const { data: instance } = await supabase
+        .from("whatsapp_instances")
+        .select("instance_key, api_token")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!instance?.api_token) {
+        return new Response(
+          JSON.stringify({ error: "Instância não encontrada. Crie uma primeiro." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!pairingPhone) {
+        return new Response(
+          JSON.stringify({ error: "Número de telefone é obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Try multiple possible UAZAPI pairing code endpoints
+      let pairRes;
+      let pairData;
+      
+      // Try /instance/pairingcode first
+      try {
+        pairRes = await fetch(`${baseUrl}/instance/pairingcode`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: instance.api_token,
+          },
+          body: JSON.stringify({ phone: pairingPhone }),
+        });
+        pairData = await pairRes.json();
+        console.log("UAZAPI pairingcode response:", JSON.stringify(pairData));
+      } catch (e) {
+        console.log("pairingcode endpoint failed, trying alternative");
+      }
+
+      // If that didn't work, try /instance/connect with phone
+      if (!pairRes?.ok || (!pairData?.code && !pairData?.pairingCode)) {
+        try {
+          pairRes = await fetch(`${baseUrl}/instance/connect`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              token: instance.api_token,
+            },
+            body: JSON.stringify({ pairingCode: true, phone: pairingPhone }),
+          });
+          pairData = await pairRes.json();
+          console.log("UAZAPI connect+pairing response:", JSON.stringify(pairData));
+        } catch (e) {
+          console.error("pairing via connect also failed:", e);
+        }
+      }
+
+      const code = pairData?.code || pairData?.pairingCode || pairData?.pairing_code || pairData?.data?.code || null;
+
+      return new Response(JSON.stringify({ 
+        success: !!code, 
+        code,
+        data: pairData 
+      }), {
+        status: code ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
