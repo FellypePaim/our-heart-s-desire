@@ -193,7 +193,14 @@ Deno.serve(async (req) => {
           Math.random() * (safeMax - safeMin + 1) + safeMin
         ) * 1000;
 
-        if (sent > 0) {
+        // Batch pause: every X messages, pause Y seconds
+        const batchSize = rule.batch_size || 10;
+        const batchPause = rule.batch_pause || 120;
+
+        if (sent > 0 && sent % batchSize === 0) {
+          console.log(`Batch pause: ${batchPause}s after ${sent} messages for rule ${rule.id}`);
+          await new Promise((r) => setTimeout(r, batchPause * 1000));
+        } else if (sent > 0) {
           await new Promise((r) => setTimeout(r, delay));
         }
 

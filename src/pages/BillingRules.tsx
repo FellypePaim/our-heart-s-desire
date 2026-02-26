@@ -36,6 +36,8 @@ interface BillingRule {
   period_direction: string;
   delay_min: number;
   delay_max: number;
+  batch_size: number;
+  batch_pause: number;
   send_hour: number;
   send_minute: number;
   last_run_at: string | null;

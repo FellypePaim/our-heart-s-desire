@@ -35,6 +35,8 @@ interface BillingRule {
   period_direction: string;
   delay_min: number;
   delay_max: number;
+  batch_size: number;
+  batch_pause: number;
   send_hour: number;
   send_minute: number;
   last_run_at: string | null;
@@ -71,6 +73,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
   const [periodDirection, setPeriodDirection] = useState("before");
   const [delayMin, setDelayMin] = useState(3);
   const [delayMax, setDelayMax] = useState(7);
+  const [batchSize, setBatchSize] = useState(10);
+  const [batchPause, setBatchPause] = useState(120);
   const [sendHour, setSendHour] = useState(9);
   const [sendMinute, setSendMinute] = useState(0);
 
@@ -86,6 +90,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
       setPeriodDirection(rule.period_direction);
       setDelayMin(Math.max(3, rule.delay_min));
       setDelayMax(Math.max(rule.delay_max, Math.max(3, rule.delay_min)));
+      setBatchSize(rule.batch_size || 10);
+      setBatchPause(rule.batch_pause || 120);
       setSendHour(rule.send_hour);
       setSendMinute(rule.send_minute);
       setSelectedMessage("");
@@ -100,6 +106,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
       setPeriodDirection("before");
       setDelayMin(3);
       setDelayMax(7);
+      setBatchSize(10);
+      setBatchPause(120);
       setSendHour(9);
       setSendMinute(0);
     }
@@ -190,6 +198,8 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
         period_direction: periodDirection,
         delay_min: delayMin,
         delay_max: delayMax,
+        batch_size: batchSize,
+        batch_pause: batchPause,
         send_hour: sendHour,
         send_minute: sendMinute,
       };
@@ -327,6 +337,36 @@ export function BillingRuleDialog({ open, onOpenChange, rule, clients }: Billing
               </div>
             </div>
 
+            {/* Batch pause */}
+            <div className="space-y-2">
+              <Label className="text-sm">Pausa por lote</Label>
+              <p className="text-xs text-muted-foreground">
+                A cada X envios, pausa Y segundos antes de continuar. Proteção extra contra bloqueio.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Envios por lote</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={batchSize}
+                    onChange={(e) => setBatchSize(Math.max(1, Number(e.target.value)))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Pausa (segundos)</Label>
+                  <Input
+                    type="number"
+                    min={10}
+                    value={batchPause}
+                    onChange={(e) => setBatchPause(Math.max(10, Number(e.target.value)))}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Exemplo: A cada {batchSize} envios, pausa de {batchPause}s antes de continuar.
+              </p>
+            </div>
             {/* Schedule */}
             <div className="space-y-2">
               <Label className="text-sm">Horário de envio</Label>
