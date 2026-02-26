@@ -134,7 +134,11 @@ export function BulkSelectedWhatsAppDialog({ clients, selectedIds, open, onOpenC
       setSentCount(count);
 
       if (count < eligibleClients.length) {
-        await new Promise((r) => setTimeout(r, sendMethod === "api" ? 300 : 800));
+        // Delay aleatório entre 3-7s (API) ou 1-2s (manual) para evitar ban por spam
+        const minDelay = sendMethod === "api" ? 3000 : 1000;
+        const maxDelay = sendMethod === "api" ? 7000 : 2000;
+        const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+        await new Promise((r) => setTimeout(r, delay));
       }
     }
 
