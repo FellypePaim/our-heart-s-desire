@@ -47,6 +47,50 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_rule_logs: {
+        Row: {
+          clients_matched: number
+          errors: Json | null
+          executed_at: string
+          id: string
+          messages_failed: number
+          messages_sent: number
+          rule_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          clients_matched?: number
+          errors?: Json | null
+          executed_at?: string
+          id?: string
+          messages_failed?: number
+          messages_sent?: number
+          rule_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          clients_matched?: number
+          errors?: Json | null
+          executed_at?: string
+          id?: string
+          messages_failed?: number
+          messages_sent?: number
+          rule_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_rule_logs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "billing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_rules: {
         Row: {
           billing_type: string
