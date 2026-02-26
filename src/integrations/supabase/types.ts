@@ -336,26 +336,62 @@ export type Database = {
       whatsapp_instances: {
         Row: {
           api_token: string
+          connection_status: string | null
           created_at: string
           id: string
           instance_key: string
           updated_at: string
           user_id: string
+          webhook_set: boolean | null
         }
         Insert: {
           api_token?: string
+          connection_status?: string | null
           created_at?: string
           id?: string
           instance_key?: string
           updated_at?: string
           user_id: string
+          webhook_set?: boolean | null
         }
         Update: {
           api_token?: string
+          connection_status?: string | null
           created_at?: string
           id?: string
           instance_key?: string
           updated_at?: string
+          user_id?: string
+          webhook_set?: boolean | null
+        }
+        Relationships: []
+      }
+      whatsapp_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          type?: string
           user_id?: string
         }
         Relationships: []

@@ -105,14 +105,44 @@ Deno.serve(async (req) => {
       if (existing) {
         await supabase
           .from("whatsapp_instances")
-          .update({ instance_key: instanceKey, api_token: instanceToken })
+          .update({ instance_key: instanceKey, api_token: instanceToken, connection_status: "disconnected" })
           .eq("user_id", user.id);
       } else {
         await supabase.from("whatsapp_instances").insert({
           user_id: user.id,
           instance_key: instanceKey,
           api_token: instanceToken,
+          connection_status: "disconnected",
         });
+      }
+
+      // Auto-set webhook for disconnect/connect notifications
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const webhookUrl = `${supabaseUrl}/functions/v1/uazapi-webhook`;
+        
+        await fetch(`${baseUrl}/webhook/set`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: instanceToken,
+          },
+          body: JSON.stringify({
+            url: webhookUrl,
+            enabled: true,
+            events: ["connection.update", "status.instance", "disconnect"],
+          }),
+        });
+
+        // Mark webhook as set
+        await supabase
+          .from("whatsapp_instances")
+          .update({ webhook_set: true })
+          .eq("instance_key", instanceKey);
+
+        console.log("Webhook set for instance:", instanceKey);
+      } catch (webhookErr) {
+        console.error("Failed to set webhook:", webhookErr);
       }
 
       return new Response(
